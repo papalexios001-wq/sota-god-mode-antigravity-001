@@ -956,7 +956,21 @@ export class MaintenanceEngine {
 
             const generatedContent = normalizeGeneratedContent({}, page.title);
             generatedContent.content = updatedHtml;
-            generatedContent.slug = page.slug;
+
+            // CRITICAL FIX: Extract slug from URL if not already set
+            let finalSlug = page.slug;
+            if (!finalSlug && page.id) {
+                try {
+                    const urlObj = new URL(page.id);
+                    const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
+                    finalSlug = pathParts[pathParts.length - 1];
+                    this.logCallback(`📍 Extracted slug from URL: "${finalSlug}"`);
+                } catch (e) {
+                    this.logCallback(`⚠️ Could not extract slug from URL: ${page.id}`);
+                }
+            }
+
+            generatedContent.slug = finalSlug;
             generatedContent.isFullSurgicalRewrite = true;
             generatedContent.surgicalSnippets = undefined;
 
