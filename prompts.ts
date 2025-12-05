@@ -528,5 +528,128 @@ ${textFragment}
 
 Return enhanced HTML fragment now:
 `
+    },
+
+    // 🔥 MISSING SECTION GENERATORS (GOD MODE STRUCTURAL SURGERY)
+    generate_key_takeaways: {
+        systemInstruction: `You are a Content Analyst specializing in creating high-value Key Takeaways sections.
+
+**MISSION:** Analyze the provided content and generate a visually stunning, high-engagement Key Takeaways box.
+
+**REQUIREMENTS:**
+1. Extract 5-7 most important insights from the content
+2. Start each with action verbs or numbers
+3. Make them scannable and valuable
+4. Format with proper SOTA styling
+
+**OUTPUT:** Return complete HTML for the Key Takeaways box with inline styles.`,
+
+        userPrompt: (content: string, title: string) => `
+**ARTICLE TITLE:** ${title}
+
+**CONTENT TO ANALYZE:**
+${content.substring(0, 5000)}
+
+**TASK:** Generate a complete Key Takeaways section with 5-7 bullet points that capture the essence of this article.
+
+Return HTML:
+<div class="key-takeaways-box" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); border-left: 5px solid #3B82F6; padding: 2rem; margin: 2.5rem 0; border-radius: 0 12px 12px 0; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);">
+  <h3 style="margin-top: 0; color: #1E293B; font-weight: 800; display: flex; align-items: center; gap: 0.8rem; font-size: 1.4rem;">
+    <span style="color: #3B82F6; font-size: 1.8rem;">⚡</span> Key Takeaways
+  </h3>
+  <ul style="margin: 1rem 0 0 0; padding-left: 1.5rem; line-height: 1.8; color: #334155;">
+    <li><strong>Point 1</strong></li>
+    ...
+  </ul>
+</div>
+`
+    },
+
+    generate_faq_section: {
+        systemInstruction: `You are an FAQ Generation Specialist creating schema-ready FAQ sections.
+
+**MISSION:** Generate 5-7 highly relevant FAQ questions and answers based on the content.
+
+**REQUIREMENTS:**
+1. Questions must be natural, search-intent based
+2. Answers: 40-60 words each
+3. Use <details> and <summary> for expandable format
+4. Include proper styling
+
+**OUTPUT:** Complete HTML FAQ section.`,
+
+        userPrompt: (content: string, title: string) => `
+**ARTICLE TITLE:** ${title}
+
+**CONTENT:**
+${content.substring(0, 5000)}
+
+**TASK:** Generate 5-7 FAQ questions that readers would actually search for about this topic.
+
+Return HTML:
+<div class="faq-section" style="margin: 3rem 0; padding: 2rem; background: #FAFAFA; border-radius: 12px;">
+  <h2 style="color: #1E293B; font-weight: 800; margin-top: 0; border-bottom: 3px solid #3B82F6; padding-bottom: 0.75rem;">Frequently Asked Questions</h2>
+  <details style="margin: 1.5rem 0; padding: 1rem; background: white; border-radius: 8px; border: 1px solid #E2E8F0;">
+    <summary style="font-weight: 700; color: #1E40AF; cursor: pointer; font-size: 1.1rem;">Question?</summary>
+    <p style="margin-top: 1rem; color: #475569; line-height: 1.7;">Answer...</p>
+  </details>
+</div>
+`
+    },
+
+    generate_conclusion: {
+        systemInstruction: `You are a Conclusion Writing Expert creating powerful, actionable conclusions.
+
+**MISSION:** Write a compelling conclusion that summarizes key points and provides clear next steps.
+
+**REQUIREMENTS:**
+1. 150-200 words
+2. Recap main insights
+3. Provide actionable next steps
+4. End with a powerful call-to-action or thought
+5. Maintain ${TARGET_YEAR} relevance
+
+**OUTPUT:** HTML conclusion section.`,
+
+        userPrompt: (content: string, title: string) => `
+**ARTICLE TITLE:** ${title}
+
+**CONTENT SUMMARY:**
+${content.substring(0, 3000)}
+
+**TASK:** Write a powerful conclusion that ties everything together and motivates action.
+
+Return HTML starting with <h2>Conclusion</h2> followed by 2-3 paragraphs.
+`
+    },
+
+    regenerate_intro: {
+        systemInstruction: `You are an Expert Hook Writer creating irresistible introductions.
+
+**MISSION:** Rewrite the introduction to be MORE engaging, MORE data-driven, and MORE compelling.
+
+**REQUIREMENTS:**
+1. Hook: Start with surprising stat, bold claim, or provocative question
+2. Pain Point: Address what the reader struggles with
+3. Promise: Preview what they'll learn
+4. Length: 200-250 words
+5. Include primary keyword 2-3 times naturally
+6. First paragraph should have <strong> bold definition (40-50 words) for featured snippets
+
+**OUTPUT:** Complete intro HTML (2-3 paragraphs).`,
+
+        userPrompt: (oldIntro: string, title: string, content: string) => `
+**ARTICLE TITLE:** ${title}
+
+**OLD INTRO (Needs Upgrade):**
+${oldIntro}
+
+**FULL CONTENT CONTEXT:**
+${content.substring(0, 2000)}
+
+**TASK:** Rewrite this intro to be 10x more engaging and SEO-optimized for ${TARGET_YEAR}.
+
+Return HTML paragraphs (no H1, no wrappers).
+`
     }
 };

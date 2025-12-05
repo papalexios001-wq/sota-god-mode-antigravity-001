@@ -597,7 +597,7 @@ export class MaintenanceEngine {
         return candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0)); 
     }
 
-    // 🚀 ULTRA GOD MODE: INTELLIGENT SURGICAL OPTIMIZER
+    // 🔥 ULTRA GOD MODE: COMPLETE STRUCTURAL SURGEON
     private async optimizeDOMSurgically(page: SitemapPage, context: GenerationContext) {
         const { wpConfig, apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel, serperApiKey } = context;
         this.logCallback(`🎯 Target: ${page.title} | Age: ${page.daysOld || 'Unknown'} days`);
@@ -609,8 +609,8 @@ export class MaintenanceEngine {
             return;
         }
 
-        // 1. INTELLIGENT PRE-ANALYSIS - Determine if update is actually needed
-        this.logCallback(`🔬 Running pre-analysis scan...`);
+        // 1. INTELLIGENT PRE-ANALYSIS
+        this.logCallback(`🔬 Running structural integrity scan...`);
         const needsUpdate = this.intelligentUpdateCheck(rawContent, page);
 
         if (!needsUpdate.shouldUpdate) {
@@ -625,12 +625,145 @@ export class MaintenanceEngine {
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawContent, 'text/html');
         const body = doc.body;
+        let structuralFixesMade = 0;
 
-        // 3. SCHEMA INJECTION (SOTA Enhancement)
+        // 3. STRUCTURAL DEFICIENCY DETECTION & REPAIR
+        this.logCallback(`🏗️ Scanning for missing critical sections...`);
+
+        // CHECK 1: Missing Key Takeaways
+        const hasKeyTakeaways = body.querySelector('.key-takeaways-box') ||
+            Array.from(body.querySelectorAll('h2, h3')).some(h =>
+                (h.textContent?.toLowerCase().includes('key takeaway') ||
+                 h.textContent?.toLowerCase().includes('at a glance'))
+            );
+
+        if (!hasKeyTakeaways) {
+            this.logCallback(`🔧 MISSING: Key Takeaways section. Generating...`);
+            try {
+                const takeawaysHtml = await memoizedCallAI(
+                    apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel,
+                    'generate_key_takeaways',
+                    [body.innerHTML, page.title],
+                    'html'
+                );
+                const cleanTakeaways = surgicalSanitizer(takeawaysHtml);
+                const firstH2 = body.querySelector('h2');
+                if (firstH2 && firstH2.parentNode) {
+                    const wrapper = doc.createElement('div');
+                    wrapper.innerHTML = cleanTakeaways;
+                    firstH2.parentNode.insertBefore(wrapper.firstElementChild || wrapper, firstH2);
+                    structuralFixesMade++;
+                    this.logCallback(`✅ Key Takeaways injected`);
+                }
+            } catch (e: any) {
+                this.logCallback(`⚠️ Key Takeaways generation failed: ${e.message}`);
+            }
+        }
+
+        // CHECK 2: Missing FAQ Section
+        const hasFAQ = body.querySelector('.faq-section') ||
+            Array.from(body.querySelectorAll('h2, h3')).some(h =>
+                (h.textContent?.toLowerCase().includes('faq') ||
+                 h.textContent?.toLowerCase().includes('frequently asked'))
+            );
+
+        if (!hasFAQ) {
+            this.logCallback(`🔧 MISSING: FAQ section. Generating...`);
+            try {
+                const faqHtml = await memoizedCallAI(
+                    apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel,
+                    'generate_faq_section',
+                    [body.innerHTML, page.title],
+                    'html'
+                );
+                const cleanFAQ = surgicalSanitizer(faqHtml);
+                const wrapper = doc.createElement('div');
+                wrapper.innerHTML = cleanFAQ;
+
+                // Insert before conclusion or at end
+                const conclusionH2 = Array.from(body.querySelectorAll('h2')).find(h =>
+                    h.textContent?.toLowerCase().includes('conclusion')
+                );
+                if (conclusionH2 && conclusionH2.parentNode) {
+                    conclusionH2.parentNode.insertBefore(wrapper.firstElementChild || wrapper, conclusionH2);
+                } else {
+                    body.appendChild(wrapper.firstElementChild || wrapper);
+                }
+                structuralFixesMade++;
+                this.logCallback(`✅ FAQ section injected`);
+            } catch (e: any) {
+                this.logCallback(`⚠️ FAQ generation failed: ${e.message}`);
+            }
+        }
+
+        // CHECK 3: Missing Conclusion
+        const hasConclusion = Array.from(body.querySelectorAll('h2, h3')).some(h =>
+            h.textContent?.toLowerCase().includes('conclusion') ||
+            h.textContent?.toLowerCase().includes('final thoughts') ||
+            h.textContent?.toLowerCase().includes('wrap')
+        );
+
+        if (!hasConclusion) {
+            this.logCallback(`🔧 MISSING: Conclusion section. Generating...`);
+            try {
+                const conclusionHtml = await memoizedCallAI(
+                    apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel,
+                    'generate_conclusion',
+                    [body.innerHTML, page.title],
+                    'html'
+                );
+                const cleanConclusion = surgicalSanitizer(conclusionHtml);
+                const wrapper = doc.createElement('div');
+                wrapper.innerHTML = cleanConclusion;
+                body.appendChild(wrapper);
+                structuralFixesMade++;
+                this.logCallback(`✅ Conclusion generated and added`);
+            } catch (e: any) {
+                this.logCallback(`⚠️ Conclusion generation failed: ${e.message}`);
+            }
+        }
+
+        // CHECK 4: Weak or Missing Intro
+        const firstParagraphs = Array.from(body.querySelectorAll('p')).slice(0, 3);
+        const introText = firstParagraphs.map(p => p.textContent).join(' ');
+        const isWeakIntro = introText.length < 150 ||
+            !introText.toLowerCase().includes('will') && !introText.toLowerCase().includes('you') ||
+            !firstParagraphs[0]?.querySelector('strong');
+
+        if (isWeakIntro && firstParagraphs.length > 0) {
+            this.logCallback(`🔧 WEAK INTRO detected. Regenerating...`);
+            try {
+                const newIntroHtml = await memoizedCallAI(
+                    apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel,
+                    'regenerate_intro',
+                    [introText, page.title, body.innerHTML],
+                    'html'
+                );
+                const cleanIntro = surgicalSanitizer(newIntroHtml);
+                const wrapper = doc.createElement('div');
+                wrapper.innerHTML = cleanIntro;
+
+                // Replace first 2-3 paragraphs
+                firstParagraphs.forEach(p => p.remove());
+                const firstH2 = body.querySelector('h2');
+                if (firstH2 && firstH2.parentNode) {
+                    Array.from(wrapper.childNodes).reverse().forEach(node => {
+                        firstH2.parentNode!.insertBefore(node, firstH2);
+                    });
+                } else {
+                    body.insertBefore(wrapper, body.firstChild);
+                }
+                structuralFixesMade++;
+                this.logCallback(`✅ Intro upgraded`);
+            } catch (e: any) {
+                this.logCallback(`⚠️ Intro regeneration failed: ${e.message}`);
+            }
+        }
+
+        // CHECK 5: Schema Markup
         const hasSchema = rawContent.includes('application/ld+json');
-        let schemaInjected = false;
         if (!hasSchema) {
-            this.logCallback("📊 Injecting structured data schema...");
+            this.logCallback("📊 MISSING: Schema markup. Injecting...");
             const schemaMarkup = generateSchemaMarkup(
                 generateFullSchema(normalizeGeneratedContent({}, page.title), wpConfig, context.siteInfo)
             );
@@ -638,29 +771,12 @@ export class MaintenanceEngine {
             schemaScript.type = 'application/ld+json';
             schemaScript.textContent = schemaMarkup.match(/<script[^>]*>([\s\S]*?)<\/script>/)?.[1] || '';
             body.appendChild(schemaScript);
-            schemaInjected = true;
+            structuralFixesMade++;
+            this.logCallback(`✅ Schema injected`);
         }
 
-        // 4. INTELLIGENT NODE SELECTION (Priority-Based)
-        const textNodes = Array.from(body.querySelectorAll('p, li, h2, h3, h4'));
-        const priorityNodes = textNodes.filter(node => {
-            if (node.closest('figure, .wp-block-image, .wp-block-embed')) return false;
-            if (node.querySelector('img, iframe, video, svg')) return false;
-            if (node.textContent?.trim().length < 20) return false; // Skip tiny fragments
-
-            const text = node.textContent?.toLowerCase() || '';
-            const priority =
-                text.includes('2023') || text.includes('2024') ? 10 : // Outdated dates = high priority
-                node.tagName === 'H2' || node.tagName === 'H3' ? 8 : // Headers = high value
-                text.length > 200 ? 6 : // Long paragraphs = good targets
-                3; // Default priority
-
-            return priority >= 5; // Only process high-priority nodes
-        });
-
-        this.logCallback(`📍 Identified ${priorityNodes.length} high-priority nodes for enhancement`);
-
-        // 5. FETCH SEMANTIC KEYWORDS FOR CONTEXT
+        // 4. TEXT ENHANCEMENT (Existing logic)
+        this.logCallback(`✍️ Enhancing text content...`);
         let semanticKeywords: string[] = [];
         try {
             const keywordResponse = await memoizedCallAI(
@@ -671,22 +787,31 @@ export class MaintenanceEngine {
             );
             const parsed = JSON.parse(keywordResponse);
             semanticKeywords = (parsed.semanticKeywords || []).map((k: any) => typeof k === 'object' ? k.keyword : k);
-            this.logCallback(`🔑 Loaded ${semanticKeywords.length} semantic keywords`);
-        } catch (e) {
-            this.logCallback(`⚠️ Keyword fetch failed, proceeding without`);
-        }
+        } catch (e) {}
 
-        // 6. BATCH PROCESSING WITH INTELLIGENT CACHING
-        const BATCH_SIZE = 5; // Larger batches for efficiency
-        let changesMade = 0;
-        const MAX_NODES = 25; // Limit to avoid over-processing
+        const textNodes = Array.from(body.querySelectorAll('p, li, h2, h3, h4'));
+        const priorityNodes = textNodes.filter(node => {
+            if (node.closest('figure, .wp-block-image, .wp-block-embed, .key-takeaways-box, .faq-section')) return false;
+            if (node.querySelector('img, iframe, video, svg')) return false;
+            if (node.textContent?.trim().length < 20) return false;
+
+            const text = node.textContent?.toLowerCase() || '';
+            const priority =
+                text.includes('2023') || text.includes('2024') ? 10 :
+                node.tagName === 'H2' || node.tagName === 'H3' ? 8 :
+                text.length > 200 ? 6 : 3;
+
+            return priority >= 5;
+        });
+
+        const BATCH_SIZE = 5;
+        let textChangesMade = 0;
+        const MAX_NODES = 20;
         const nodesToProcess = priorityNodes.slice(0, MAX_NODES);
 
         for (let i = 0; i < nodesToProcess.length; i += BATCH_SIZE) {
             const batch = nodesToProcess.slice(i, i + BATCH_SIZE);
             const batchText = batch.map(n => n.outerHTML).join('\n\n');
-
-            this.logCallback(`⚡ Batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(nodesToProcess.length/BATCH_SIZE)}`);
 
             try {
                 const improvedBatchHtml = await memoizedCallAI(
@@ -698,7 +823,6 @@ export class MaintenanceEngine {
 
                 const cleanBatch = surgicalSanitizer(improvedBatchHtml);
 
-                // VALIDATION: Only apply if structure matches
                 if (cleanBatch && cleanBatch.length > 20) {
                     const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = cleanBatch;
@@ -709,28 +833,26 @@ export class MaintenanceEngine {
                             if (newNode && node.tagName === newNode.tagName) {
                                 const oldText = node.textContent || '';
                                 const newText = newNode.textContent || '';
-
-                                // CHANGE DETECTION: Only update if meaningful difference
                                 const changeRatio = Math.abs(newText.length - oldText.length) / Math.max(oldText.length, 1);
-                                if (changeRatio > 0.05 || oldText !== newText) { // 5% difference threshold
+                                if (changeRatio > 0.05 || oldText !== newText) {
                                     node.innerHTML = newNode.innerHTML;
-                                    changesMade++;
+                                    textChangesMade++;
                                 }
                             }
                         });
                     }
                 }
             } catch (e: any) {
-                this.logCallback(`⚠️ Batch error: ${e.message}`);
+                this.logCallback(`⚠️ Text enhancement error: ${e.message}`);
             }
-            await delay(600); // Rate limiting
+            await delay(500);
         }
 
-        // 7. SMART PUBLISHING DECISION
-        const significantChanges = changesMade > 0 || schemaInjected;
+        // 5. PUBLISH DECISION
+        const totalChanges = structuralFixesMade + textChangesMade;
 
-        if (significantChanges) {
-            this.logCallback(`💾 Publishing ${changesMade} enhancements + Schema...`);
+        if (totalChanges > 0) {
+            this.logCallback(`💾 Publishing: ${structuralFixesMade} structural fixes + ${textChangesMade} text enhancements`);
             const updatedHtml = body.innerHTML;
 
             const publishResult = await publishItemToWordPress(
@@ -755,7 +877,7 @@ export class MaintenanceEngine {
                 this.logCallback(`❌ Publish failed: ${publishResult.message}`);
             }
         } else {
-            this.logCallback("✓ No actionable improvements found. Content is optimized.");
+            this.logCallback("✓ Content is already SOTA-optimized. No changes needed.");
             localStorage.setItem(`sota_last_proc_${page.id}`, Date.now().toString());
         }
     }
