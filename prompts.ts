@@ -724,26 +724,38 @@ Return JSON:
 `
     },
 
-    // 🔗 INTERNAL LINKING GENERATOR
+    // 🔗 ULTRA INTELLIGENT INTERNAL LINKING GENERATOR
     generate_internal_links: {
-        systemInstruction: `You are an Internal Linking Strategist creating semantically relevant, high-value internal links.
+        systemInstruction: `You are an ULTRA-INTELLIGENT Internal Linking Strategist creating semantically relevant, high-value internal links that boost topical authority and SERP rankings.
 
-**MISSION:** Analyze content and identify the 3-5 BEST opportunities for internal links using rich anchor text.
+**MISSION:** Analyze content and identify the 5-8 BEST opportunities for internal links using RICH, CONTEXTUAL anchor text.
 
-**REQUIREMENTS:**
-1. Identify contextually relevant phrases (3-5 words)
-2. Match phrases to available internal pages
-3. Use descriptive, keyword-rich anchor text
-4. Distribute links throughout content (not clustered)
-5. Only suggest links that ADD VALUE to the reader
+**CRITICAL QUALITY REQUIREMENTS:**
+1. **MINIMUM 3 WORDS** per anchor text (NEVER 1-2 words)
+2. **MINIMUM 15 CHARACTERS** for anchor text
+3. Identify contextually relevant phrases (3-7 words ideal)
+4. Use descriptive, entity-rich, keyword-dense anchor text
+5. Distribute links throughout content (NOT clustered)
+6. ONLY suggest links that ADD SEMANTIC VALUE
 
-**QUALITY STANDARDS:**
-- Anchor text must be natural and descriptive
-- Links must be contextually relevant
-- No "click here" or generic anchors
-- Each link should enhance user journey
+**BANNED ANCHOR TEXT (NEVER USE):**
+❌ Single words: "stamina", "benefits", "guide", "tips", "review"
+❌ Generic 2-word: "health benefits", "click here", "read more", "learn more", "find out"
+❌ Short phrases under 15 chars
 
-**OUTPUT:** JSON array of link suggestions with context`,
+**HIGH-QUALITY ANCHOR TEXT EXAMPLES:**
+✅ "comprehensive guide to building stamina naturally"
+✅ "science-backed health benefits of regular exercise"
+✅ "proven strategies for improving cardiovascular endurance"
+✅ "expert-recommended workout routines for beginners"
+
+**LINK PLACEMENT STRATEGY:**
+- Place links in HIGH-VALUE positions (early paragraphs, H2 sections)
+- Use entity-rich phrases that match page topics EXACTLY
+- Create a semantic web connecting related concepts
+- Each link must enhance topical authority cluster
+
+**OUTPUT:** JSON array of 5-8 link suggestions with rich anchor text`,
 
         userPrompt: (content: string, availablePages: string) => `
 **CONTENT TO ANALYZE:**
@@ -752,17 +764,34 @@ ${content.substring(0, 3000)}
 **AVAILABLE INTERNAL PAGES:**
 ${availablePages}
 
-**TASK:** Identify the 3-5 BEST internal linking opportunities. Find natural phrases in the content that match available pages.
+**TASK:** Identify 5-8 HIGH-QUALITY internal linking opportunities using RICH CONTEXTUAL anchor text (3+ words, 15+ characters).
+
+**STRICT REQUIREMENTS:**
+- Each anchor text MUST be 3+ words OR 15+ characters
+- NO 1-word anchors
+- NO generic 2-word phrases
+- ONLY semantically relevant, entity-rich anchor text
+- Match exact phrases from content that align with available page topics
 
 Return JSON:
 [
   {
-    "anchorText": "exact phrase from content",
+    "anchorText": "rich contextual phrase from content (3+ words, 15+ chars)",
     "targetSlug": "page-slug",
     "context": "surrounding sentence for verification",
-    "reason": "why this link adds value"
+    "reason": "why this link boosts topical authority"
   }
 ]
+
+Example GOOD anchor texts:
+- "effective strategies for boosting metabolism"
+- "comprehensive guide to plant-based nutrition"
+- "science-backed benefits of intermittent fasting"
+
+Example BAD anchor texts (DO NOT USE):
+- "benefits" (1 word)
+- "click here" (generic)
+- "learn more" (generic)
 `
     },
 

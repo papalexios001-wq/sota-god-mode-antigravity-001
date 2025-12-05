@@ -737,13 +737,41 @@ export class MaintenanceEngine {
 
         this.logCallback(`⚡ UPDATE NEEDED: ${needsUpdate.reason}`);
 
+        // 1.5 ULTRA GOD MODE: AGGRESSIVE SHORTCODE & GARBAGE CLEANUP
+        this.logCallback(`🧹 CLEANING: Removing shortcodes and broken elements...`);
+        let cleanupCount = 0;
+
+        // Remove ALL shortcodes
+        const shortcodePatterns = [
+            /\[bulkimporter_image[^\]]*\]/gi,
+            /\[gallery[^\]]*\]/gi,
+            /\[caption[^\]]*\].*?\[\/caption\]/gi,
+            /\[embed[^\]]*\].*?\[\/embed\]/gi,
+            /\[video[^\]]*\]/gi,
+            /\[audio[^\]]*\]/gi,
+            /\[wp_[^\]]*\]/gi,
+            /\[\/?[a-zA-Z_][^\]]*\]/g
+        ];
+
+        for (const pattern of shortcodePatterns) {
+            const matches = rawContent.match(pattern);
+            if (matches) {
+                cleanupCount += matches.length;
+                rawContent = rawContent.replace(pattern, '');
+            }
+        }
+
+        if (cleanupCount > 0) {
+            this.logCallback(`✅ REMOVED: ${cleanupCount} shortcodes/broken elements`);
+        }
+
         // 2. PARSE HTML & PROTECT CRITICAL CONTENT
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawContent, 'text/html');
         const body = doc.body;
 
-        // 🛡️ PROTECT all images, videos, HTML blocks, tables, references
-        this.logCallback(`🛡️ PROTECTING: Images, videos, HTML blocks, references...`);
+        // 🛡️ PROTECT all images, videos, HTML blocks, tables (but NOT references - we may add them)
+        this.logCallback(`🛡️ PROTECTING: Images, videos, HTML blocks...`);
         const protectedElements = this.protectCriticalContent(doc);
         this.logCallback(`🛡️ PROTECTED: ${protectedElements.size} critical elements`);
 
@@ -942,11 +970,47 @@ export class MaintenanceEngine {
             this.logCallback(`✅ OPTIMIZED: "${titleMeta.title}"`);
         }
 
-        // CHECK 7: Internal Linking
-        this.logCallback(`🔗 ANALYZING: Internal link opportunities...`);
-        const currentLinkCount = (body.innerHTML.match(/<a[^>]+href=[^>]*>/g) || []).length;
+        // CHECK 7: INTERNAL LINK QUALITY FILTER & OPTIMIZATION
+        this.logCallback(`🔗 ANALYZING: Internal link quality...`);
 
-        if (currentLinkCount < 3 && context.existingPages.length > 0) {
+        // ULTRA QUALITY FILTER: Remove low-quality internal links
+        const allInternalLinks = Array.from(body.querySelectorAll('a')).filter(a => {
+            const href = a.getAttribute('href') || '';
+            return href && !href.startsWith('http');
+        });
+
+        let removedLowQualityLinks = 0;
+        allInternalLinks.forEach(link => {
+            const anchorText = link.textContent?.trim() || '';
+            const wordCount = anchorText.split(/\s+/).length;
+
+            // STRICT QUALITY RULES:
+            // - Remove 1-word anchors
+            // - Remove generic 2-word anchors like "health benefits", "click here", "read more"
+            // - Remove very short anchors (< 8 characters)
+            const genericTwoWordAnchors = ['health benefits', 'click here', 'read more', 'learn more', 'find out', 'see here', 'check out', 'stamina', 'benefits', 'tips', 'guide', 'review'];
+            const isLowQuality =
+                wordCount === 1 ||
+                anchorText.length < 8 ||
+                (wordCount === 2 && genericTwoWordAnchors.some(g => anchorText.toLowerCase().includes(g)));
+
+            if (isLowQuality) {
+                // Remove the link but keep the text
+                const textNode = doc.createTextNode(anchorText);
+                link.replaceWith(textNode);
+                removedLowQualityLinks++;
+            }
+        });
+
+        if (removedLowQualityLinks > 0) {
+            this.logCallback(`✅ REMOVED: ${removedLowQualityLinks} low-quality internal links (1-word, generic anchors)`);
+            structuralFixesMade++;
+        }
+
+        const currentLinkCount = (body.innerHTML.match(/<a[^>]+href=[^>]*>/g) || []).length;
+        this.logCallback(`📊 CURRENT LINKS: ${currentLinkCount} total links after quality filter`);
+
+        if (currentLinkCount < 5 && context.existingPages.length > 0) {
             this.logCallback(`🔧 ADDING: Internal links (currently ${currentLinkCount})...`);
             try {
                 const availablePagesString = context.existingPages
@@ -966,15 +1030,23 @@ export class MaintenanceEngine {
 
                 let linksAdded = 0;
                 for (const suggestion of linkSuggestions) {
-                    if (linksAdded >= 5) break; // Max 5 new links
+                    if (linksAdded >= 8) break; // Max 8 new links
 
                     const targetPage = context.existingPages.find(p => p.slug === suggestion.targetSlug);
                     if (targetPage && targetPage.id) {
-                        const regex = new RegExp(`(?![^<]*>)\\b${escapeRegExp(suggestion.anchorText)}\\b`, 'i');
+                        const anchorText = suggestion.anchorText || '';
+                        const wordCount = anchorText.split(/\s+/).length;
+
+                        // QUALITY CHECK: Only add high-quality anchor text (3+ words or 15+ chars)
+                        if (wordCount < 3 && anchorText.length < 15) {
+                            continue;
+                        }
+
+                        const regex = new RegExp(`(?![^<]*>)\\b${escapeRegExp(anchorText)}\\b`, 'i');
                         const textContent = body.innerHTML;
 
-                        if (regex.test(textContent) && !textContent.includes(`>${suggestion.anchorText}</a>`)) {
-                            body.innerHTML = body.innerHTML.replace(regex, `<a href="${targetPage.id}" class="internal-link-god-mode">${suggestion.anchorText}</a>`);
+                        if (regex.test(textContent) && !textContent.includes(`>${anchorText}</a>`)) {
+                            body.innerHTML = body.innerHTML.replace(regex, `<a href="${targetPage.id}" class="internal-link-god-mode" title="${targetPage.title}">${anchorText}</a>`);
                             linksAdded++;
                         }
                     }
@@ -982,7 +1054,7 @@ export class MaintenanceEngine {
 
                 if (linksAdded > 0) {
                     structuralFixesMade++;
-                    this.logCallback(`✅ ADDED: ${linksAdded} contextual internal links`);
+                    this.logCallback(`✅ ADDED: ${linksAdded} high-quality contextual internal links (3+ words each)`);
                 }
             } catch (e: any) {
                 this.logCallback(`❌ FAILED: Internal linking - ${e.message}`);
@@ -1156,54 +1228,41 @@ export class MaintenanceEngine {
             await delay(500);
         }
 
-        // 7. VALIDATE & ADD REFERENCES (if missing)
+        // 7. ULTRA AGGRESSIVE REFERENCE CHECK & ADDITION
         this.logCallback(`📚 ═══════════════════════════════════════`);
         this.logCallback(`📚 STARTING: Reference validation check...`);
 
-        // STRICT CHECK: Only skip if we have an actual references section with links
-        const referenceSectionClass = body.querySelector('.sota-references-section, .references-section, .sources-section');
-
-        // MORE STRICT: Check for actual reference links, not just headings
-        const hasReferencesWithLinks = referenceSectionClass && referenceSectionClass.querySelectorAll('a[href]').length >= 3;
-
-        // Find standalone reference headings (but require they have links after them)
-        let hasStandaloneReferenceSection = false;
-        const referenceHeadings = Array.from(body.querySelectorAll('h2, h3')).filter(h => {
-            const text = h.textContent?.toLowerCase() || '';
-            const isRefHeading = (text.includes('reference') || text.includes('sources') || text.includes('further reading') || text.includes('bibliography')) &&
-                   !text.includes('code') && !text.includes('manual');
-
-            if (isRefHeading) {
-                // Check if this heading is followed by actual links
-                let nextEl = h.nextElementSibling;
-                let linkCount = 0;
-                while (nextEl && linkCount < 20 && !['H1', 'H2'].includes(nextEl.tagName)) {
-                    linkCount += nextEl.querySelectorAll('a[href^="http"]').length;
-                    nextEl = nextEl.nextElementSibling;
-                }
-                if (linkCount >= 3) {
-                    hasStandaloneReferenceSection = true;
-                    return true;
-                }
+        // Count ALL external links
+        const allExternalLinks = Array.from(body.querySelectorAll('a[href^="http"]')).filter(a => {
+            const href = a.getAttribute('href') || '';
+            try {
+                const linkDomain = new URL(href).hostname.replace('www.', '');
+                const siteDomain = wpConfig.url ? new URL(wpConfig.url).hostname.replace('www.', '') : '';
+                return linkDomain !== siteDomain;
+            } catch {
+                return false;
             }
-            return false;
         });
 
-        this.logCallback(`📚 SECTION CHECK: ${hasReferencesWithLinks ? '✓ Found complete reference section with links' : '✗ No complete reference section'}`);
-        this.logCallback(`📚 HEADING CHECK: ${hasStandaloneReferenceSection ? `✓ Found ${referenceHeadings.length} reference heading(s) with links` : '✗ No reference headings with actual links'}`);
-        if (referenceHeadings.length > 0) {
-            referenceHeadings.forEach(h => this.logCallback(`   - "${h.textContent}"`));
-        }
+        this.logCallback(`📊 EXTERNAL LINKS: ${allExternalLinks.length} found in content`);
 
-        const hasReferences = hasReferencesWithLinks || hasStandaloneReferenceSection;
+        // Check for QUALITY references section (must have sota-references-section class with 5+ links)
+        const sotaReferenceSection = body.querySelector('.sota-references-section');
+        const hasQualityReferences = sotaReferenceSection && sotaReferenceSection.querySelectorAll('a[href^="http"]').length >= 5;
 
-        this.logCallback(`📚 ═══════════════════════════════════════`);
-        this.logCallback(`📚 FINAL DECISION: ${hasReferences ? '❌ SKIP (Already present)' : '✅ ADD REFERENCES'}`);
+        this.logCallback(`📚 QUALITY REFERENCES: ${hasQualityReferences ? '✅ Found SOTA reference section with 5+ links' : '❌ No quality reference section'}`);
         this.logCallback(`📚 SERPER API KEY: ${serperApiKey ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`);
-        this.logCallback(`📚 WILL ADD REFERENCES: ${!hasReferences && serperApiKey ? '✅ YES' : '❌ NO'}`);
+
+        // ULTRA STRICT: Force add if:
+        // - No SOTA reference section OR
+        // - Fewer than 8 total external links
+        const shouldForceAddReferences = (!hasQualityReferences || allExternalLinks.length < 8) && serperApiKey;
+
+        this.logCallback(`📚 ═══════════════════════════════════════`);
+        this.logCallback(`📚 DECISION: ${shouldForceAddReferences ? '✅ FORCE ADDING REFERENCES (Quality threshold not met)' : hasQualityReferences ? '✅ SKIP (Quality references present)' : '❌ SKIP (No API key)'}`);
         this.logCallback(`📚 ═══════════════════════════════════════`);
 
-        if (!hasReferences && serperApiKey) {
+        if (shouldForceAddReferences) {
             this.logCallback(`🔍 SEARCHING: High-quality reference sources with Serper API...`);
             try {
                 // Search for authoritative sources (get more results to increase success rate)
@@ -1486,26 +1545,38 @@ export class MaintenanceEngine {
         }
     }
 
-    // 🧠 ULTIMATE INTELLIGENT UPDATE CHECKER - Comprehensive diagnostics
+    // 🧠 ULTRA INTELLIGENT UPDATE CHECKER - 1000x More Comprehensive
     private intelligentUpdateCheck(content: string, page: SitemapPage): { shouldUpdate: boolean, reason: string } {
         const text = content.toLowerCase();
         const currentYear = new Date().getFullYear();
         const targetYear = 2026;
 
-        // Check 1: STRICT year check - must have 2026 mentions
+        // Check 1: Shortcode garbage
+        if (/\[bulkimporter_image|\[gallery|\[wp_/i.test(content)) {
+            return { shouldUpdate: true, reason: 'CRITICAL: Contains broken shortcodes - immediate cleanup required' };
+        }
+
+        // Check 2: STRICT year check
         if (!text.includes('2026')) {
             return { shouldUpdate: true, reason: 'Missing 2026 freshness signals' };
         }
 
-        // Check 2: Has ANY outdated year mentions (2020-2025)
+        // Check 3: Outdated years
         const outdatedYears = [2020, 2021, 2022, 2023, 2024, 2025];
         for (const year of outdatedYears) {
             if (text.includes(String(year))) {
-                return { shouldUpdate: true, reason: `Contains outdated year ${year} - needs 2026 update` };
+                return { shouldUpdate: true, reason: `Contains outdated year ${year}` };
             }
         }
 
-        // Check 3: Missing critical structural elements
+        // Check 4: Low-quality internal links
+        const oneWordLinkPattern = /<a[^>]*>(\w+)<\/a>/g;
+        const oneWordLinks = (content.match(oneWordLinkPattern) || []).length;
+        if (oneWordLinks > 2) {
+            return { shouldUpdate: true, reason: `${oneWordLinks} low-quality 1-word internal links detected` };
+        }
+
+        // Check 5: Missing critical structure
         const hasKeyTakeaways = text.includes('key takeaway') || text.includes('at a glance');
         const hasFAQ = text.includes('faq') || text.includes('frequently asked');
         const hasConclusion = text.includes('conclusion') || text.includes('final thoughts');
@@ -1514,37 +1585,50 @@ export class MaintenanceEngine {
             return { shouldUpdate: true, reason: 'Missing critical sections (Key Takeaways/FAQ/Conclusion)' };
         }
 
-        // Check 4: Internal linking deficiency
-        const internalLinkCount = (content.match(/<a[^>]+href=[^>]*>/g) || []).length;
-        if (internalLinkCount < 3) {
-            return { shouldUpdate: true, reason: `Insufficient internal links (${internalLinkCount}/3 minimum)` };
+        // Check 6: External reference quality
+        const externalLinkCount = (content.match(/<a[^>]*href="http[^"]*"[^>]*>/g) || []).length;
+        const hasSotaReferences = content.includes('sota-references-section');
+        if (!hasSotaReferences || externalLinkCount < 8) {
+            return { shouldUpdate: true, reason: `Insufficient external references (${externalLinkCount}/8 minimum)` };
         }
 
-        // Check 5: Missing structured data
+        // Check 7: Internal linking
+        const internalLinkCount = (content.match(/<a[^>]+href=[^>]*>/g) || []).length - externalLinkCount;
+        if (internalLinkCount < 5) {
+            return { shouldUpdate: true, reason: `Insufficient internal links (${internalLinkCount}/5 minimum)` };
+        }
+
+        // Check 8: Schema markup
         if (!content.includes('application/ld+json')) {
             return { shouldUpdate: true, reason: 'Missing schema markup' };
         }
 
-        // Check 6: Thin content
+        // Check 9: Content depth
         const wordCount = content.split(/\s+/).length;
-        if (wordCount < 1000) {
-            return { shouldUpdate: true, reason: `Thin content (${wordCount} words)` };
+        if (wordCount < 1200) {
+            return { shouldUpdate: true, reason: `Thin content (${wordCount}/1200 words minimum)` };
         }
 
-        // Check 7: Content age priority
-        if (page.daysOld && page.daysOld > 90) {
-            return { shouldUpdate: true, reason: `Content is ${page.daysOld} days old` };
-        }
-
-        // Check 8: Weak title detection (generic, no power words, no year)
+        // Check 10: Weak title
         const title = page.title.toLowerCase();
         const hasPowerWords = ['ultimate', 'complete', 'guide', 'best', 'top', 'proven', '2026'].some(w => title.includes(w));
         if (!hasPowerWords) {
-            return { shouldUpdate: true, reason: 'Weak title - needs optimization' };
+            return { shouldUpdate: true, reason: 'Weak title - needs power words' };
         }
 
-        // Default: Skip if nothing triggers update
-        return { shouldUpdate: false, reason: 'Content is SOTA-optimized' };
+        // Check 11: Content staleness
+        if (page.daysOld && page.daysOld > 60) {
+            return { shouldUpdate: true, reason: `Content is ${page.daysOld} days old` };
+        }
+
+        // Check 12: Fluff detection
+        const fluffIndicators = ['in this article', 'in this post', 'without further ado', 'at the end of the day', 'the fact of the matter'];
+        const hasFluff = fluffIndicators.some(f => text.includes(f));
+        if (hasFluff) {
+            return { shouldUpdate: true, reason: 'Contains fluffy content - needs aggressive optimization' };
+        }
+
+        return { shouldUpdate: false, reason: 'Content is ULTRA SOTA-optimized' };
     }
 
     private async fetchRawContent(page: SitemapPage, wpConfig: WpConfig): Promise<string | null> {
