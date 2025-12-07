@@ -234,6 +234,7 @@ const analyzeCompetitors = async (keyword: string, serperApiKey: string): Promis
 
 const discoverPostIdAndEndpoint = async (url: string): Promise<{ id: number, endpoint: string } | null> => {
     try {
+        console.log(`[DEBUG] discoverPostIdAndEndpoint: Fetching ${url}`);
         const response = await fetchWithProxies(url);
 
         if (!response.ok) {
@@ -247,12 +248,16 @@ const discoverPostIdAndEndpoint = async (url: string): Promise<{ id: number, end
         }
 
         const html = await response.text();
+        console.log(`[DEBUG] discoverPostIdAndEndpoint: HTML fetched, length: ${html.length}`);
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
 
+        // Method 1: Look for REST API link
         const apiLink = doc.querySelector('link[rel="https://api.w.org/"]');
         if (apiLink) {
             const href = apiLink.getAttribute('href');
+            console.log(`[DEBUG] discoverPostIdAndEndpoint: Found api.w.org link: ${href}`);
             if (href) {
                 const match = href.match(/\/(\d+)$/);
                 if (match) {
@@ -260,9 +265,39 @@ const discoverPostIdAndEndpoint = async (url: string): Promise<{ id: number, end
                     return { id: parseInt(match[1]), endpoint: href };
                 }
             }
+        } else {
+            console.log(`[DEBUG] discoverPostIdAndEndpoint: No api.w.org link found in HTML`);
         }
 
-        console.log(`[DEBUG] discoverPostIdAndEndpoint: Could not find API link in HTML for ${url}`);
+        // Method 2: Look for shortlink (WordPress default)
+        const shortlink = doc.querySelector('link[rel="shortlink"]');
+        if (shortlink) {
+            const href = shortlink.getAttribute('href');
+            console.log(`[DEBUG] discoverPostIdAndEndpoint: Found shortlink: ${href}`);
+            if (href) {
+                const match = href.match(/[?&]p=(\d+)/);
+                if (match) {
+                    const postId = parseInt(match[1]);
+                    console.log(`[DEBUG] discoverPostIdAndEndpoint: Found post ID ${postId} from shortlink`);
+                    return { id: postId, endpoint: '' };
+                }
+            }
+        }
+
+        // Method 3: Look for post ID in body class
+        const body = doc.querySelector('body');
+        if (body) {
+            const bodyClass = body.getAttribute('class') || '';
+            console.log(`[DEBUG] discoverPostIdAndEndpoint: Body class: ${bodyClass}`);
+            const postIdMatch = bodyClass.match(/postid-(\d+)/);
+            if (postIdMatch) {
+                const postId = parseInt(postIdMatch[1]);
+                console.log(`[DEBUG] discoverPostIdAndEndpoint: Found post ID ${postId} from body class`);
+                return { id: postId, endpoint: '' };
+            }
+        }
+
+        console.log(`[DEBUG] discoverPostIdAndEndpoint: Could not find post ID in HTML for ${url}`);
         return null;
     } catch (e) {
         console.log(`[DEBUG] discoverPostIdAndEndpoint: Exception for ${url}:`, e);
