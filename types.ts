@@ -149,4 +149,6 @@ export interface GenerationContext {
     openrouterModels: string[];
     selectedGroqModel: string;
     neuronConfig: NeuronConfig;
+    excludedUrls?: string[];
+    excludedCategories?: string[];
 }

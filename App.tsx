@@ -123,6 +123,8 @@ const App = () => {
     const [bulkPublishLogs, setBulkPublishLogs] = useState<string[]>([]);
     const [isGodMode, setIsGodMode] = useState(() => localStorage.getItem('sota_god_mode') === 'true');
     const [godModeLogs, setGodModeLogs] = useState<string[]>([]);
+    const [excludedUrls, setExcludedUrls] = useState<string[]>(() => JSON.parse(localStorage.getItem('excludedUrls') || '[]'));
+    const [excludedCategories, setExcludedCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem('excludedCategories') || '[]'));
     const [optimizedHistory, setOptimizedHistory] = useState<OptimizedLog[]>([]);
     const [wpDiagnostics, setWpDiagnostics] = useState<any>(null);
     const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
@@ -137,6 +139,8 @@ const App = () => {
     useEffect(() => { localStorage.setItem('geoTargeting', JSON.stringify(geoTargeting)); }, [geoTargeting]);
     useEffect(() => { localStorage.setItem('siteInfo', JSON.stringify(siteInfo)); }, [siteInfo]);
     useEffect(() => { localStorage.setItem('neuronConfig', JSON.stringify(neuronConfig)); }, [neuronConfig]);
+    useEffect(() => { localStorage.setItem('excludedUrls', JSON.stringify(excludedUrls)); }, [excludedUrls]);
+    useEffect(() => { localStorage.setItem('excludedCategories', JSON.stringify(excludedCategories)); }, [excludedCategories]);
 
     const fetchProjectsRef = useRef<string>('');
     const fetchProjects = useCallback(async (key: string) => {
@@ -189,14 +193,14 @@ const App = () => {
     useEffect(() => {
         localStorage.setItem('sota_god_mode', String(isGodMode));
         if (isGodMode) {
-            const context: GenerationContext = { dispatch, existingPages, siteInfo, wpConfig, geoTargeting, serperApiKey: apiKeys.serperApiKey, apiKeyStatus, apiClients, selectedModel, openrouterModels, selectedGroqModel, neuronConfig };
+            const context: GenerationContext = { dispatch, existingPages, siteInfo, wpConfig, geoTargeting, serperApiKey: apiKeys.serperApiKey, apiKeyStatus, apiClients, selectedModel, openrouterModels, selectedGroqModel, neuronConfig, excludedUrls, excludedCategories };
             maintenanceEngine.start(context);
         } else { maintenanceEngine.stop(); }
         if (isGodMode && existingPages.length > 0) {
-             const context: GenerationContext = { dispatch, existingPages, siteInfo, wpConfig, geoTargeting, serperApiKey: apiKeys.serperApiKey, apiKeyStatus, apiClients, selectedModel, openrouterModels, selectedGroqModel, neuronConfig };
+             const context: GenerationContext = { dispatch, existingPages, siteInfo, wpConfig, geoTargeting, serperApiKey: apiKeys.serperApiKey, apiKeyStatus, apiClients, selectedModel, openrouterModels, selectedGroqModel, neuronConfig, excludedUrls, excludedCategories };
             maintenanceEngine.updateContext(context);
         }
-    }, [isGodMode, existingPages, apiClients, isCrawling]); 
+    }, [isGodMode, existingPages, apiClients, isCrawling, excludedUrls, excludedCategories]); 
 
     const validateApiKey = useCallback(debounce(async (provider: string, key: string) => {
         if (!key) { setApiKeyStatus(prev => ({ ...prev, [provider]: 'idle' })); setApiClients(prev => ({ ...prev, [provider]: null })); return; }
@@ -746,6 +750,80 @@ const App = () => {
                                                         </div>
                                                     </div>
                                                 )}
+
+                                                <div style={{
+                                                    background: '#020617',
+                                                    padding: '1rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #1e293b',
+                                                    marginBottom: '1rem'
+                                                }}>
+                                                    <div style={{color: '#F59E0B', fontWeight: 'bold', marginBottom: '1rem', fontSize: '0.9rem'}}>
+                                                        🚫 Exclusion Controls
+                                                    </div>
+
+                                                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                                        <div>
+                                                            <label style={{display: 'block', color: '#94A3B8', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600}}>
+                                                                Exclude URLs (one per line)
+                                                            </label>
+                                                            <textarea
+                                                                value={excludedUrls.join('\n')}
+                                                                onChange={e => setExcludedUrls(e.target.value.split('\n').map(url => url.trim()).filter(Boolean))}
+                                                                placeholder="https://example.com/page1&#10;https://example.com/page2"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    minHeight: '80px',
+                                                                    background: '#1e293b',
+                                                                    border: '1px solid #334155',
+                                                                    borderRadius: '6px',
+                                                                    padding: '0.5rem',
+                                                                    color: '#E2E8F0',
+                                                                    fontSize: '0.75rem',
+                                                                    fontFamily: 'monospace',
+                                                                    resize: 'vertical'
+                                                                }}
+                                                            />
+                                                            {excludedUrls.length > 0 && (
+                                                                <div style={{marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748B'}}>
+                                                                    {excludedUrls.length} URL{excludedUrls.length !== 1 ? 's' : ''} excluded
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <label style={{display: 'block', color: '#94A3B8', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600}}>
+                                                                Exclude Categories (one per line)
+                                                            </label>
+                                                            <textarea
+                                                                value={excludedCategories.join('\n')}
+                                                                onChange={e => setExcludedCategories(e.target.value.split('\n').map(cat => cat.trim()).filter(Boolean))}
+                                                                placeholder="category-slug-1&#10;category-slug-2"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    minHeight: '80px',
+                                                                    background: '#1e293b',
+                                                                    border: '1px solid #334155',
+                                                                    borderRadius: '6px',
+                                                                    padding: '0.5rem',
+                                                                    color: '#E2E8F0',
+                                                                    fontSize: '0.75rem',
+                                                                    fontFamily: 'monospace',
+                                                                    resize: 'vertical'
+                                                                }}
+                                                            />
+                                                            {excludedCategories.length > 0 && (
+                                                                <div style={{marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748B'}}>
+                                                                    {excludedCategories.length} categor{excludedCategories.length !== 1 ? 'ies' : 'y'} excluded
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{marginTop: '0.75rem', padding: '0.75rem', background: '#1e293b', borderRadius: '6px', fontSize: '0.75rem', color: '#94A3B8'}}>
+                                                        ℹ️ GOD MODE will skip optimizing these URLs and categories. Changes take effect immediately.
+                                                    </div>
+                                                </div>
 
                                                 <div className="god-mode-dashboard" style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem'}}>
                                                     <div className="god-mode-logs" style={{

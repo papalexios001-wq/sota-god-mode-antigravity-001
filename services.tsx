@@ -705,13 +705,46 @@ export class MaintenanceEngine {
 
     private async getPrioritizedPages(context: GenerationContext): Promise<SitemapPage[]> {
         let candidates = [...context.existingPages];
+
+        const excludedUrls = context.excludedUrls || [];
+        const excludedCategories = context.excludedCategories || [];
+
+        if (excludedUrls.length > 0 || excludedCategories.length > 0) {
+            const initialCount = candidates.length;
+            candidates = candidates.filter(p => {
+                if (excludedUrls.includes(p.url)) {
+                    this.logCallback(`🚫 Excluded (URL): ${p.title}`);
+                    return false;
+                }
+
+                if (p.categories && excludedCategories.length > 0) {
+                    const pageCategories = Array.isArray(p.categories) ? p.categories : [];
+                    const hasExcludedCategory = pageCategories.some(cat =>
+                        excludedCategories.includes(cat) ||
+                        excludedCategories.includes(typeof cat === 'object' ? (cat as any).slug : cat)
+                    );
+                    if (hasExcludedCategory) {
+                        this.logCallback(`🚫 Excluded (Category): ${p.title}`);
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            const excludedCount = initialCount - candidates.length;
+            if (excludedCount > 0) {
+                this.logCallback(`✅ Applied exclusions: ${excludedCount} page(s) filtered out`);
+            }
+        }
+
         candidates = candidates.filter(p => {
             const lastProcessed = localStorage.getItem(`sota_last_proc_${p.id}`);
             if (!lastProcessed) return true;
             const hoursSince = (Date.now() - parseInt(lastProcessed)) / (1000 * 60 * 60);
-            return hoursSince > 24; 
+            return hoursSince > 24;
         });
-        return candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0)); 
+        return candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0));
     }
 
     // 🛡️ CONTENT PROTECTION SYSTEM - Preserve critical elements
