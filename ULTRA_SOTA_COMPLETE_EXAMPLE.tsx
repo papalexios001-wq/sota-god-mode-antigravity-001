@@ -1,4 +1,4 @@
-import { buildUltraSOTAPrompt } from './prompts-ultra-sota';
+import { buildUltraSOTAPrompt, buildGodModePrompt } from './prompts-ultra-sota';
 import {
     performCompetitorGapAnalysis,
     generateAndValidateReferences,
@@ -26,7 +26,9 @@ export async function generateUltraSOTAContent(
     serpData: any[],
     neuronData: string | null = null,
     recentNews: string | null = null,
-    onProgress?: (message: string, details?: any) => void
+    onProgress?: (message: string, details?: any) => void,
+    useGodMode: boolean = false,
+    existingContent: string = ''
 ): Promise<{
     content: string;
     semanticKeywords: string[];
@@ -102,14 +104,29 @@ export async function generateUltraSOTAContent(
         onProgress?.('✅ Article plan created', { step: 3, total: 8 });
 
         onProgress?.('✍️ Step 4/8: Generating Alex Hormozi style content...', { step: 4, total: 8 });
-        const prompt = buildUltraSOTAPrompt(
-            articlePlan,
-            allSemanticKeywords,
-            gapAnalysis.gaps.map((g: CompetitorGap) => g.opportunity),
-            existingPages,
-            neuronData,
-            recentNews
-        );
+
+        let prompt;
+        if (useGodMode) {
+            onProgress?.('🔥 GOD MODE VISUAL SUPERNOVA ACTIVATED', { step: 4, total: 8 });
+            const existingImages = extractExistingImages(existingContent);
+            prompt = buildGodModePrompt(
+                keyword,
+                allSemanticKeywords,
+                gapAnalysis.gaps.map((g: CompetitorGap) => g.opportunity),
+                existingPages,
+                existingImages,
+                neuronData
+            );
+        } else {
+            prompt = buildUltraSOTAPrompt(
+                articlePlan,
+                allSemanticKeywords,
+                gapAnalysis.gaps.map((g: CompetitorGap) => g.opportunity),
+                existingPages,
+                neuronData,
+                recentNews
+            );
+        }
 
         let generatedContent = '';
 
@@ -315,6 +332,7 @@ export interface UltraSOTAConfig {
     recentNews?: string | null;
     mode: 'generate' | 'refresh';
     existingContent?: string;
+    useGodMode?: boolean; // Enable Visual Supernova styling with Tailwind classes
     onProgress?: (message: string, details?: any) => void;
 }
 
