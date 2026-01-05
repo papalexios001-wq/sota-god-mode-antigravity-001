@@ -12,10 +12,7 @@ import {
     AppFooter, AnalysisModal, BulkPublishModal, ReviewModal, SidebarNav, SkeletonLoader, ApiKeyInput, CheckIcon, XIcon, WordPressEndpointInstructions
 } from './components';
 import { LandingPage } from './LandingPage';
-import { 845
-845
-} from './src/GodModeURLInput';
-import {
+import { GodModeURLInput } from './src/GodModeURLInput';
     SitemapPage, ContentItem, GeneratedContent, SiteInfo, ExpandedGeoTargeting, ApiClients, WpConfig, NeuronConfig, GapAnalysisSuggestion, GenerationContext
 } from './types';
 import { callAiWithRetry, debounce, fetchWor14
