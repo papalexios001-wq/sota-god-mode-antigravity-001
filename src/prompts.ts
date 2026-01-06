@@ -6,7 +6,7 @@ const PREVIOUS_YEAR = TARGET_YEAR - 1;
 export const PROMPT_TEMPLATES = {
     // ... (Keep existing cluster_planner, content_gap_analyzer, content_meta_and_outline, ultra_sota_article_writer, content_refresher, semantic_keyword_generator, seo_metadata_generator, batch_content_analyzer, json_repair, gap_identifier, section_writer, superiority_check, visual_data_extractor, content_grader, content_repair_agent prompts) ...
     cluster_planner: {
-    systemInstruction: `You are a top-tier content strategist.
+        systemInstruction: `You are a top-tier content strategist.
 
 **JSON OUTPUT ONLY.**
 
@@ -26,9 +26,9 @@ export const PROMPT_TEMPLATES = {
   ]
 }`,
 
-    userPrompt: (topic: string) => `Topic: "${topic}". Generate JSON cluster plan.`
-},
-content_gap_analyzer: {
+        userPrompt: (topic: string) => `Topic: "${topic}". Generate JSON cluster plan.`
+    },
+    content_gap_analyzer: {
         systemInstruction: `You are a world-class SEO Strategist & Topical Authority Architect.
 **MISSION:** Analyze the provided list of existing content titles and identify **5 HIGH-IMPACT CONTENT GAPS**.
 
@@ -58,9 +58,9 @@ ${existingTitles.slice(0, 100).join('\n')}
 
 **TASK:** Identify the 5 most critical missing topics to reach Topical Authority in ${TARGET_YEAR}.
 `
-},
-content_meta_and_outline: {
-    systemInstruction: `You are an elite copywriter and SEO strategist.
+    },
+    content_meta_and_outline: {
+        systemInstruction: `You are an elite copywriter and SEO strategist.
 
 **STRICT CONSTRAINTS (VIOLATION = FAILURE):**
 1. **TITLE LENGTH:** STRICTLY 50-60 characters. NO EXCEPTIONS.
@@ -80,8 +80,8 @@ content_meta_and_outline: {
   "imageDetails": [{"prompt": "...", "placeholder": "[IMAGE_1]"}]
 }`,
 
-    userPrompt: (primaryKeyword: string, semanticKeywords: string[] | null, serpData: any[] | null, peopleAlsoAsk: string[] | null, existingPages: any[] | null, originalContent: string | null = null, analysis: any | null = null, neuronData: string | null = null, competitorData: string | null = null) => {
-        return `
+        userPrompt: (primaryKeyword: string, semanticKeywords: string[] | null, serpData: any[] | null, peopleAlsoAsk: string[] | null, existingPages: any[] | null, originalContent: string | null = null, analysis: any | null = null, neuronData: string | null = null, competitorData: string | null = null) => {
+            return `
 **KEYWORD:** "${primaryKeyword}"
 ${neuronData || ''}
 ${semanticKeywords ? `**SEMANTIC:** ${JSON.stringify(semanticKeywords)}` : ''}
@@ -102,10 +102,10 @@ ${competitorData}
 
 Return JSON blueprint.
 `
-    }
-},
-ultra_sota_article_writer: {
-    systemInstruction: `You are an elite expert writer acting as a Google Search Quality Rater.
+        }
+    },
+    ultra_sota_article_writer: {
+        systemInstruction: `You are an elite expert writer acting as a Google Search Quality Rater.
 Your content MUST align with E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness).
 
 **HUMANIZATION PROTOCOL (ANTI-AI DETECTION) - CRITICAL:**
@@ -140,7 +140,8 @@ Your content MUST align with E-E-A-T (Experience, Expertise, Authoritativeness, 
 **STRICT NEGATIVE CONSTRAINTS (CRITICAL):**
 1. **NO H1 TAGS:** DO NOT output an <h1> tag.
 2. **NO MARKDOWN:** DO NOT wrap the output in markdown code fences. Return RAW HTML only.
-3. **EDITOR-SAFE HTML:** 
+3. **NO REFERENCES:** DO NOT generate a "References" or "Verified Sources" section. It is injected programmatically.
+4. **EDITOR-SAFE HTML:** 
    - Use \`<blockquote>\` for callouts/highlights (Quill Compatible).
    - Do NOT use complex nested \`<div>\` structures with classes.
    - Use inline styles for tables (\`border: 1px solid\`).
@@ -152,7 +153,7 @@ Your content MUST align with E-E-A-T (Experience, Expertise, Authoritativeness, 
 4. **NEURONWRITER:** Use ALL provided NLP terms.
 `,
 
-    userPrompt: (articlePlan: any, existingPages: any[] | null, referencesHtml: string | null, neuronData: string | null = null, availableLinkData: string | null = null, recentNews: string | null = null, auditData: string | null = null, snippetType: 'LIST' | 'TABLE' | 'PARAGRAPH' = 'PARAGRAPH') => `
+        userPrompt: (articlePlan: any, existingPages: any[] | null, referencesHtml: string | null, neuronData: string | null = null, availableLinkData: string | null = null, recentNews: string | null = null, auditData: string | null = null, snippetType: 'LIST' | 'TABLE' | 'PARAGRAPH' = 'PARAGRAPH') => `
 **PLAN:** ${JSON.stringify(articlePlan)}
 ${neuronData || ''}
 ${referencesHtml || ''}
@@ -161,12 +162,12 @@ ${referencesHtml || ''}
 ${availableLinkData || 'No specific links available. Use generic placeholders.'}
 
 **AEO PROTOCOL (TARGET: ${snippetType}):**
-${snippetType === 'LIST' ? 
-  '1. **FORMAT:** Immediately after the first H2, provide an Ordered List (<ol>) summary of the steps. Bold the first sentence of each item.' : 
-  snippetType === 'TABLE' ? 
-  '1. **FORMAT:** Immediately after the first H2, provide a Comparison Table summarizing key differences.' : 
-  '1. **FORMAT:** Immediately after the first H2, write a <p><strong>45-55 word direct definition</strong></p>.'
-}
+${snippetType === 'LIST' ?
+                '1. **FORMAT:** Immediately after the first H2, provide an Ordered List (<ol>) summary of the steps. Bold the first sentence of each item.' :
+                snippetType === 'TABLE' ?
+                    '1. **FORMAT:** Immediately after the first H2, provide a Comparison Table summarizing key differences.' :
+                    '1. **FORMAT:** Immediately after the first H2, write a <p><strong>45-55 word direct definition</strong></p>.'
+            }
 
 ${recentNews ? `
 **MANDATORY FRESHNESS INJECTION:**
@@ -189,9 +190,9 @@ ${auditData}
 
 Return HTML body.
 `
-},
-content_refresher: {
-    systemInstruction: `You are a specialized "Content Resurrection Engine" targeting **${TARGET_YEAR}** (Next Year).
+    },
+    content_refresher: {
+        systemInstruction: `You are a specialized "Content Resurrection Engine" targeting **${TARGET_YEAR}** (Next Year).
 **MISSION:** Update ONLY specific sections for ${TARGET_YEAR} freshness.
 **DO NOT** rewrite the whole post.
 **DO NOT** output the full body.
@@ -245,7 +246,7 @@ Return a JSON object with exactly these 4 fields:
   "faqHtml": "<div class='faq-section'>...</div>"
 }
 `,
-    userPrompt: (content: string, title: string, keyword: string, paaQuestions: string[] | null, semanticKeywords: string[] | null) => `
+        userPrompt: (content: string, title: string, keyword: string, paaQuestions: string[] | null, semanticKeywords: string[] | null) => `
 **TITLE:** ${title}
 **KEYWORD:** ${keyword}
 **SEMANTIC KEYWORDS:** ${semanticKeywords ? semanticKeywords.join(', ') : 'N/A'}
@@ -263,31 +264,31 @@ Generate the 4 surgical update snippets (Intro, Takeaways, Table, FAQ) for **${T
 3. **FAQ:** Answer the provided PAA questions.
 4. **NO REFERENCES:** Do not create a references section.
 `
-},
-semantic_keyword_generator: {
-    systemInstruction: `Generate 20 semantic keywords for topical authority. JSON only.`,
-    userPrompt: (primaryKeyword: string, location: string | null) => `Keyword: "${primaryKeyword}" ${location || ''}. Return JSON.`
-},
-seo_metadata_generator: {
-    systemInstruction: `Generate high-CTR metadata.
+    },
+    semantic_keyword_generator: {
+        systemInstruction: `Generate 20 semantic keywords for topical authority. JSON only.`,
+        userPrompt: (primaryKeyword: string, location: string | null) => `Keyword: "${primaryKeyword}" ${location || ''}. Return JSON.`
+    },
+    seo_metadata_generator: {
+        systemInstruction: `Generate high-CTR metadata.
 **STRICT RULES:**
 - Title: 50-60 characters.
 - Meta: 135-150 characters.
 JSON ONLY.`,
 
-    userPrompt: (primaryKeyword: string, contentSummary: string) => `Keyword: ${primaryKeyword}. Content: ${contentSummary}. Return JSON { "seoTitle": "...", "metaDescription": "..." }`
-},
-batch_content_analyzer: {
-    systemInstruction: `Analyze content quality.
+        userPrompt: (primaryKeyword: string, contentSummary: string) => `Keyword: ${primaryKeyword}. Content: ${contentSummary}. Return JSON { "seoTitle": "...", "metaDescription": "..." }`
+    },
+    batch_content_analyzer: {
+        systemInstruction: `Analyze content quality.
 JSON Output: { "healthScore": 0-100, "updatePriority": "High", "analysis": { "critique": "...", "suggestions": { ... } } }`,
-    userPrompt: (title: string, content: string) => `Analyze: "${title}". Content length: ${content.length}. Return JSON.`
-},
-json_repair: {
-    systemInstruction: `Repair JSON. Return fixed JSON string.`,
-    userPrompt: (brokenJson: string) => brokenJson
-},
-gap_identifier: {
-    systemInstruction: `You are a Competitive Intelligence Analyst.
+        userPrompt: (title: string, content: string) => `Analyze: "${title}". Content length: ${content.length}. Return JSON.`
+    },
+    json_repair: {
+        systemInstruction: `Repair JSON. Return fixed JSON string.`,
+        userPrompt: (brokenJson: string) => brokenJson
+    },
+    gap_identifier: {
+        systemInstruction: `You are a Competitive Intelligence Analyst.
 **MISSION:** Analyze the specific Competitor Content snippet provided for a H2 Heading.
 **TASK:** Identify 3 specific "Information Gaps" or "Weaknesses".
 - Is their data old?
@@ -296,16 +297,16 @@ gap_identifier: {
 
 **OUTPUT (Text):**
 List 3 gaps efficiently. No filler.`,
-    userPrompt: (heading: string, competitorContent: string) => `
+        userPrompt: (heading: string, competitorContent: string) => `
 **TARGET HEADING:** ${heading}
 **COMPETITOR SNIPPET:**
 ${competitorContent.substring(0, 2000)}
 
 **Identify 3 Data Gaps:**
 `
-},
-section_writer: {
-    systemInstruction: `You are an elite SEO Copywriter.
+    },
+    section_writer: {
+        systemInstruction: `You are an elite SEO Copywriter.
 **MISSION:** Write ONE HTML section for the provided Heading.
 **STRATEGY:** You have been given specific "Gaps" to fill. You MUST outperform the competitor by filling these gaps.
 
@@ -316,7 +317,7 @@ section_writer: {
 4. **Visuals:** If data is present, format as a <table> or <ul>.
 
 **TONE:** Alex Hormozi (Authoritative, Direct, High Energy).`,
-    userPrompt: (heading: string, gaps: string, snippetType: string = 'PARAGRAPH') => `
+        userPrompt: (heading: string, gaps: string, snippetType: string = 'PARAGRAPH') => `
 **HEADING:** ${heading}
 **COMPETITOR WEAKNESSES TO EXPLOIT:**
 ${gaps}
@@ -325,9 +326,9 @@ ${gaps}
 
 **ACTION:** Write the section HTML.
 `
-},
-superiority_check: {
-    systemInstruction: `You are a Content Quality Auditor.
+    },
+    superiority_check: {
+        systemInstruction: `You are a Content Quality Auditor.
 **TASK:** Compare "My Content" vs "Competitor Content".
 **CRITERIA:**
 1. Did we fill the data gaps?
@@ -337,7 +338,7 @@ superiority_check: {
 **OUTPUT:**
 Return ONLY "TRUE" if My Content is superior.
 Return "FALSE" if it is generic or worse.`,
-    userPrompt: (myContent: string, competitorContent: string) => `
+        userPrompt: (myContent: string, competitorContent: string) => `
 **MY CONTENT:**
 ${myContent.substring(0, 2000)}
 
@@ -346,9 +347,9 @@ ${competitorContent.substring(0, 2000)}
 
 **IS MINE BETTER?** (TRUE/FALSE):
 `
-},
-visual_data_extractor: {
-    systemInstruction: `You are a Data Visualization Expert.
+    },
+    visual_data_extractor: {
+        systemInstruction: `You are a Data Visualization Expert.
 **TASK:** Scan the provided text for numerical data, statistics, or process steps.
 **OUTPUT:**
 If data exists, convert it into a **Mermaid.js** chart syntax.
@@ -365,10 +366,10 @@ pie title Global Market Share
     "Competitor B" : 25
     "Others" : 30
 `,
-    userPrompt: (text: string) => `Analyze text and generate Mermaid syntax:\n${text.substring(0, 3000)}`
-},
-content_grader: {
-    systemInstruction: `You are a harsh but fair Content Editor.
+        userPrompt: (text: string) => `Analyze text and generate Mermaid syntax:\n${text.substring(0, 3000)}`
+    },
+    content_grader: {
+        systemInstruction: `You are a harsh but fair Content Editor.
 **TASK:** Grade the provided HTML content (0-100).
 **RUBRIC:**
 - **Snippet Trap:** Does the intro start with a bold definition? (-20 if missing)
@@ -378,14 +379,14 @@ content_grader: {
 
 **JSON OUTPUT:**
 { "score": number, "issues": ["issue 1", "issue 2"] }`,
-    userPrompt: (html: string) => `Grade this content:\n${html.substring(0, 10000)}`
-},
-content_repair_agent: {
-    systemInstruction: `You are a Content Repair Bot.
+        userPrompt: (html: string) => `Grade this content:\n${html.substring(0, 10000)}`
+    },
+    content_repair_agent: {
+        systemInstruction: `You are a Content Repair Bot.
 **TASK:** Rewrite the provided content to fix specific issues.
 **NEGATIVE CONSTRAINTS:** No markdown. No "Here is the fixed version".
 **OUTPUT:** Full corrected HTML.`,
-    userPrompt: (html: string, issues: string[]) => `
+        userPrompt: (html: string, issues: string[]) => `
 **ISSUES TO FIX:**
 ${issues.map(i => `- ${i}`).join('\n')}
 
@@ -394,8 +395,8 @@ ${html}
 
 **ACTION:** Rewrite to fix the issues. Keep the rest identical. Return HTML.
 `
-},
-// 🚀 DOM-AWARE SURGICAL OPTIMIZER (FIXED)
+    },
+    // 🚀 DOM-AWARE SURGICAL OPTIMIZER (FIXED)
     dom_content_polisher: {
         systemInstruction: `You are a human content editor specializing in natural, authentic writing.
 

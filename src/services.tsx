@@ -41,7 +41,9 @@ class SotaAIError extends Error {
 const stripLLMGeneratedReferences = (html: string): string => {
     if (!html) return html;
     // Remove hardcoded References & Further Reading section
-    const refPattern = /<h[2-3][^>]*>\s*References\s*&\s*Further\s*Reading\s*<\/h[2-3]>[\s\S]*?(<\/div>\s*$|$)/i;
+    // Matches <h2> or <h3> containing keywords, followed by content until start of another major section or end
+    // Explicitly catches "Verified References" which caused user issues
+    const refPattern = /(<hr[^>]*>\s*)?<h[2-3][^>]*>.*?(References|Further Reading|Bibliography|Verified (References|Sources)|Sources).*?<\/h[2-3]>[\s\S]*?(<hr|<\/div>\s*$|$)/i;
     return html.replace(refPattern, '');
 };
 
@@ -1141,10 +1143,12 @@ export const generateContent = {
 
                 try { enforceWordCount(healedHtml, TARGET_MIN_WORDS, TARGET_MAX_WORDS); } catch (e) { }
 
-                let finalContent = postProcessGeneratedHtml(healedHtml, generated, youtubeVideos, siteInfo, false) + referencesHtml;
+                let postProcessed = postProcessGeneratedHtml(healedHtml, generated, youtubeVideos, siteInfo, false);
 
-                // 🔥 CRITICAL HOTFIX: Strip LLM-generated hardcoded references BEFORE sanitizer
-                finalContent = stripLLMGeneratedReferences(finalContent);
+                // 🔥 CRITICAL HOTFIX: Strip LLM-generated hardcoded references BEFORE appending real ones
+                postProcessed = stripLLMGeneratedReferences(postProcessed);
+
+                let finalContent = postProcessed + referencesHtml;
                 finalContent = surgicalSanitizer(finalContent);
 
                 generated.content = processInternalLinks(finalContent, existingPages);
