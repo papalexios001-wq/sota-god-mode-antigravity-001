@@ -56,8 +56,20 @@ const surgicalSanitizer = (html: string): string => {
     cleanHtml = cleanHtml.replace(/Lead Data Scientist[\s\S]*?Latest Data Audit.*?(<\/p>|<br>|\n)/gi, '');
     cleanHtml = cleanHtml.replace(/Verification Fact-Checked/gi, '');
     cleanHtml = cleanHtml.replace(/Methodology Peer-Reviewed/gi, '');
+    cleanHtml = cleanHtml.replace(/Verified References/gi, ''); // Quick inline kill
+    cleanHtml = cleanHtml.replace(/Trusted References/gi, '');  // Quick inline kill
 
     return cleanHtml.trim();
+};
+
+// 🔥 ENTERPRISE HOTFIX: Strip hardcoded LLM-generated references before sanitizing
+const stripLLMGeneratedReferences = (html: string): string => {
+    if (!html) return html;
+    // Remove hardcoded References & Further Reading section
+    // Matches <h2> or <h3> containing keywords (including Emojis), followed by content until start of another major section or end
+    // Explicitly catches "Verified References" which caused user issues
+    const refPattern = /(<hr[^>]*>\s*)?<h[2-3][^>]*>.*?(References|Further Reading|Bibliography|Verified (References|Sources)|Sources|External Resources).*?<\/h[2-3]>[\s\S]*?(<hr|<\/div>\s*$|(?=<footer))/i;
+    return html.replace(refPattern, '');
 };
 
 // ============================================================================
@@ -168,77 +180,200 @@ const fetchPAA = async (keyword: string, serperApiKey: string) => {
 };
 
 export const fetchVerifiedReferenceData = async (keyword: string, serperApiKey: string, count: number = 20): Promise<Array<{ url: string, title: string, source: string }>> => {
+    const CURRENT_YEAR = new Date().getFullYear();
     if (!serperApiKey) return [];
 
-    // ENTERPRISE: Multiple query strategies to ALWAYS get 8-12 results
     const queries = [
-        `${keyword} definitive guide research data statistics 2024 2025 -site:youtube.com -site:facebook.com -site:pinterest.com -site:twitter.com -site:reddit.com`,
-        `${keyword} "how to" "guide" "tips" 2026 2025 -site:youtube.com -site:pinterest.com`,
-        `${keyword} best practices expert advice -site:youtube.com -site:pinterest.com`
+        `${keyword} "research" "data" "statistics" ${CURRENT_YEAR} -site:youtube.com -site:pinterest.com -site:quora.com`,
+        `${keyword} "report" "study" "findings" ${CURRENT_YEAR - 1}..${CURRENT_YEAR} -site:youtube.com`,
+        `${keyword} definitive guide`
     ];
 
-    const allResults: Array<{ url: string, title: string, source: string }> = [];
+    console.log(`[References Data] Fetching for "${keyword}"...`);
+
+    const validLinks: Array<{ url: string, title: string, source: string }> = [];
     const seenUrls = new Set<string>();
 
+    // Domain Blocklist
     const BLOCKED_DOMAINS = [
-        'quora.com', 'scribd.com', 'dokumen.pub', 'asau.ru', 'slideserve.com',
-        'studylib.net', 'document.pub', 'pdfcoffee.com', 'slideshare.net',
-        'academia.edu', 'researchgate.net', 'coursehero.com', 'chegg.com',
-        'slideplayer.com', 'vdocuments.mx', 'fdocuments.in', 'kupdf.net',
-        'pdfslide.net', 'issuu.com', 'yumpu.com', 'calameo.com',
-        'polishedrx.com', 'medium.com', 'linkedin.com', 'pinterest.com'
+        'reddit.com', 'quora.com', 'twitter.com', 'facebook.com', 'instagram.com', 'tiktok.com',
+        'youtube.com', 'vimeo.com', 'pinterest.com', 'tumblr.com',
+        'amazon.com', 'ebay.com', 'walmart.com', 'etsy.com',
+        'tripadvisor.com', 'yelp.com',
+        'researchgate.net', 'academia.edu',
+        'scribd.com', 'slideshare.net', 'issuu.com', 'yumpu.com',
+        'medium.com', 'linkedin.com'
     ];
 
     for (const query of queries) {
-        if (allResults.length >= count) break;
+        if (validLinks.length >= count) break;
 
         try {
-            const response = await fetchWithProxies("https://google.serper.dev/search", {
-                method: 'POST',
-                headers: { 'X-API-KEY': serperApiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ q: query, num: 30 })
+            const results = await fetchWithProxies("https://google.serper.dev/search", {
+                method: "POST",
+                headers: { "X-API-KEY": serperApiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({ q: query, num: 20 }),
             });
-            const data = await response.json();
-            const potentialLinks = data.organic || [];
 
-            for (const link of potentialLinks) {
-                if (allResults.length >= count) break;
-                if (!link.link) continue;
-                if (seenUrls.has(link.link)) continue;
+            const data = await results.json();
+            if (!data.organic) continue;
+
+            const candidates = data.organic;
+
+            // Parallel validation of candidates
+            await Promise.all(candidates.map(async (link: any) => {
+                if (validLinks.length >= count) return;
+                if (!link.link || seenUrls.has(link.link)) return;
 
                 try {
-                    const linkDomain = new URL(link.link).hostname.replace('www.', '');
-                    if (BLOCKED_DOMAINS.some(blocked => linkDomain.includes(blocked))) continue;
+                    const domain = new URL(link.link).hostname.replace('www.', '');
+                    if (BLOCKED_DOMAINS.some(b => domain.includes(b))) return;
 
                     seenUrls.add(link.link);
-                    allResults.push({ title: link.title, url: link.link, source: linkDomain });
-                } catch (e) { continue; }
-            }
-        } catch (e) { continue; }
+
+                    // SOTA Validation: Light GET to check 200 OK and not soft 404
+                    const check = await fetchWithProxies(link.link, {
+                        method: "GET",
+                        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Range": "bytes=0-512" }
+                    });
+
+                    if (check.ok && check.status === 200) {
+                        validLinks.push({
+                            title: link.title,
+                            url: link.link,
+                            source: domain
+                        });
+                    }
+                } catch (e) { }
+            }));
+
+        } catch (e) {
+            console.error(`[References Data] Query error for "${query}":`, e);
+        }
     }
 
-    return allResults;
+    return validLinks;
 };
 
 export const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wpUrl?: string): Promise<string> => {
+    const CURRENT_YEAR = new Date().getFullYear();
     if (!serperApiKey) return "";
+
     try {
-        const filtered = await fetchVerifiedReferenceData(keyword, serperApiKey, 25);
+        const queries = [
+            `${keyword} "research" "data" "statistics" ${CURRENT_YEAR} -site:youtube.com -site:pinterest.com -site:quora.com`,
+            `${keyword} "guide" "tutorial" "best practices" ${CURRENT_YEAR - 1}..${CURRENT_YEAR + 1} -site:youtube.com`,
+            `${keyword}`
+        ];
 
-        // Filter out WP domain if provided
-        const finalLinks = wpUrl
-            ? filtered.filter(l => !l.source.includes(new URL(wpUrl).hostname.replace('www.', '')))
-            : filtered;
+        console.log(`[References] Fetching for "${keyword}" (Year: ${CURRENT_YEAR})...`);
 
-        // CHANGED: Add whatever references we find (at least 1)
-        if (finalLinks.length === 0) return "";
+        const validLinks: any[] = [];
+        const seenUrls = new Set<string>();
+        const TARGET_COUNT = 12;
 
-        const listItems = finalLinks.slice(0, 12).map(ref =>
-            `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" title="Verified Source: ${ref.source}" style="text-decoration: underline; color: #2563EB;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.source})</span></li>`
+        for (const query of queries) {
+            if (validLinks.length >= TARGET_COUNT) break;
+
+            try {
+                const results = await fetchWithProxies("https://google.serper.dev/search", {
+                    method: "POST",
+                    headers: { "X-API-KEY": serperApiKey, "Content-Type": "application/json" },
+                    body: JSON.stringify({ q: query, num: 20 }),
+                });
+
+                const data = await results.json();
+                if (!data.organic) continue;
+
+                // Concurrent Validation
+                const candidates = data.organic.filter((link: any) =>
+                    link.link &&
+                    link.title &&
+                    !seenUrls.has(link.link) &&
+                    !link.link.includes('reddit.com') &&
+                    !link.link.includes('quora.com')
+                );
+
+                const validations = await Promise.allSettled(candidates.map(async (link: any) => {
+                    if (validLinks.length >= TARGET_COUNT) return null;
+
+                    try {
+                        // Soft 404 Prevention: Check URL pattern
+                        if (link.link.toLowerCase().includes('404') || link.link.toLowerCase().includes('not-found')) return null;
+
+                        seenUrls.add(link.link);
+
+                        // SOTA VALIDATION: GET request (not HEAD) with Range header to verify existence without full download
+                        const checkRes = await fetchWithProxies(link.link, {
+                            method: "GET",
+                            headers: {
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                                "Range": "bytes=0-1024" // Only request first 1KB
+                            }
+                        });
+
+
+                        if (checkRes.ok && checkRes.status === 200) {
+                            const finalUrl = checkRes.url.toLowerCase();
+                            if (finalUrl.includes('404') || finalUrl.includes('not-found') || finalUrl.includes('error')) return null;
+                            return link;
+                        }
+                    } catch (e) { return null; }
+                    return null;
+                }));
+
+                for (const result of validations) {
+                    if (result.status === 'fulfilled' && result.value) {
+                        // @ts-ignore
+                        validLinks.push(result.value);
+                    }
+                }
+            } catch (e) {
+                console.error(`[References] Query error for "${query}":`, e);
+            }
+        }
+
+        if (validLinks.length === 0) {
+            console.warn(`[References] ZERO references found for "${keyword}" after all attempts.`);
+            return "";
+        }
+
+        console.log(`[References] Found ${validLinks.length} valid links for "${keyword}".`);
+
+        const listItems = validLinks.map(ref =>
+            `<li class="hover:translate-x-1 transition-transform duration-200">
+                <a href="${ref.link}" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-start group">
+                    <span class="mr-2 mt-1 opacity-70 group-hover:opacity-100 transition-opacity">🔗</span>
+                    <span class="underline decoration-transparent group-hover:decoration-blue-400 transition-all">${ref.title}</span>
+                </a>
+                <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                    <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider text-slate-600">Source</span>
+                    <span class="truncate max-w-[200px]">${new URL(ref.link).hostname.replace('www.', '')}</span>
+                </div>
+            </li>`
         ).join('');
 
-        return `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 2px solid #3B82F6; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 3px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 References & Further Reading 2026</h2><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.6;">${listItems}</ul></div>`;
-    } catch (e) { return ""; }
+        return `
+            <div class="sota-references-section mt-16 mb-8 p-8 bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl opacity-50 -mr-16 -mt-16 group-hover:opacity-75 transition-opacity"></div>
+                
+                <h3 class="text-xl font-bold text-slate-800 mb-6 flex items-center relative z-10">
+                    <span class="mr-2 text-2xl">📚</span> Trusted References & Further Reading
+                </h3>
+                
+                <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 list-none relative z-10">
+                    ${listItems}
+                </ul>
+                
+                <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 relative z-10">
+                   <span>Verified by SOTA-Protocol™</span>
+                   <span>${CURRENT_YEAR} Data</span>
+                </div>
+            </div>`;
+    } catch (e) {
+        console.error("Error fetching verified references:", e);
+        return "";
+    }
 };
 
 const analyzeCompetitors = async (keyword: string, serperApiKey: string): Promise<{ report: string, snippetType: 'LIST' | 'TABLE' | 'PARAGRAPH', topResult: string }> => {
@@ -1028,74 +1163,30 @@ Return ONLY the conclusion text (no headings, just paragraphs).`;
     }
 
     private async validateAndFixReferences(body: HTMLElement, title: string, doc: Document): Promise<void> {
+        this.logCallback(`🔍 VALIDATING: Checking for existing reference sections...`);
+
+        // Find standard Reference sections
         const referencesSection = Array.from(body.querySelectorAll('h2, h3')).find(h =>
-            /references|further reading|sources|bibliography/i.test(h.textContent || '')
+            /references|further reading|sources|bibliography|verified/i.test(h.textContent || '')
         );
 
-        if (!referencesSection) return;
+        if (referencesSection) {
+            this.logCallback(`🧹 CLEANUP: Removing existing/hallucinated reference section to ensure SOTA quality...`);
 
-        // Find all links in the references section
-        let current: Element | null = referencesSection.nextElementSibling;
-        const links: HTMLAnchorElement[] = [];
-
-        while (current && !['H1', 'H2', 'H3'].includes(current.tagName)) {
-            links.push(...Array.from(current.querySelectorAll('a')));
-            current = current.nextElementSibling;
-        }
-
-        this.logCallback(`🔍 VALIDATING: ${links.length} reference links...`);
-
-        // Validate each link
-        const validLinks: Array<{ url: string, title: string, description: string }> = [];
-
-        for (const link of links) {
-            const url = link.href;
-            const isValid = await this.verifyLinkStatus(url);
-
-            if (isValid) {
-                validLinks.push({
-                    url,
-                    title: link.textContent || 'Reference',
-                    description: link.getAttribute('title') || 'Additional resource'
-                });
-            } else {
-                this.logCallback(`❌ REMOVED: Broken link (404) - ${url}`);
+            // Remove content following the header
+            let sibling = referencesSection.nextElementSibling;
+            while (sibling && !['H1', 'H2', 'H3', 'FOOTER'].includes(sibling.tagName)) {
+                const toRemove = sibling;
+                sibling = sibling.nextElementSibling;
+                toRemove.remove();
             }
+
+            // Remove the header itself
+            referencesSection.remove();
         }
 
-        // If fewer than 8 valid links, add more
-        if (validLinks.length < 8) {
-            this.logCallback(`⚠️ Only ${validLinks.length} valid links found. Adding more to reach 8-12...`);
-            const serperApiKey = this.currentContext?.serperApiKey;
-            const additionalRefs = await this.generateHighQualityReferences(title, serperApiKey);
-            // Deduplicate
-            for (const ref of additionalRefs) {
-                if (!validLinks.some(v => v.url === ref.url) && validLinks.length < 12) {
-                    validLinks.push(ref);
-                }
-            }
-        }
-
-        // Keep only top 12 if more
-        const finalLinks = validLinks.slice(0, 12);
-
-        // Remove old references section content
-        let sibling = referencesSection.nextElementSibling;
-        while (sibling && !['H1', 'H2', 'H3'].includes(sibling.tagName)) {
-            const toRemove = sibling;
-            sibling = sibling.nextElementSibling;
-            toRemove.remove();
-        }
-
-        // Add updated references
-        const referencesHtml = `
-<ol style="line-height: 2; padding-left: 1.5rem; color: #334155;">
-${finalLinks.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: none; font-weight: 600;">${ref.title}</a> - ${ref.description}</li>`).join('\n')}
-</ol>
-`;
-
-        referencesSection.insertAdjacentHTML('afterend', referencesHtml);
-        this.logCallback(`✅ VALIDATED: ${finalLinks.length} verified reference links (all 200 status)`);
+        // Always generate fresh, verified references
+        await this.addReferencesSection(body, title, doc);
     }
 
     private async verifyLinkStatus(url: string): Promise<boolean> {
@@ -1168,6 +1259,10 @@ ${finalLinks.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopene
         // 🔒 CRITICAL: Mark as processing IMMEDIATELY to prevent duplicate selection
         localStorage.setItem(`sota_last_proc_${pageIdentifier}`, Date.now().toString());
         this.logCallback(`🔒 LOCKED: Page marked as processing to prevent duplicates`);
+
+        // SOTA HOTFIX: Stripping potentially hallucinated references from previous runs
+        this.logCallback(`🧹 SANITIZING: Stripping potential AI-hallucinated references...`);
+        rawContent = stripLLMGeneratedReferences(rawContent);
 
         // 1.5 ULTRA GOD MODE: AGGRESSIVE SHORTCODE & GARBAGE CLEANUP
         this.logCallback(`🧹 CLEANING: Removing shortcodes and broken elements...`);

@@ -23,7 +23,8 @@ import { getNeuronWriterAnalysis, formatNeuronDataForPrompt } from "./neuronwrit
 import { getGuaranteedYoutubeVideos, enforceWordCount, normalizeGeneratedContent, postProcessGeneratedHtml, performSurgicalUpdate, processInternalLinks, fetchWithProxies, smartCrawl, escapeRegExp } from "./contentUtils";
 import { Buffer } from 'buffer';
 import { generateFullSchema, generateSchemaMarkup } from "./schema-generator";
-import { detectCategory, generateReferenceHTML, REFERENCE_CATEGORIES } from './reference-engine';
+// reference-engine import removed
+
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -37,13 +38,12 @@ class SotaAIError extends Error {
     }
 }
 
-// 🔥 ENTERPRISE HOTFIX: Strip hardcoded LLM-generated references before sanitizing
 const stripLLMGeneratedReferences = (html: string): string => {
     if (!html) return html;
     // Remove hardcoded References & Further Reading section
-    // Matches <h2> or <h3> containing keywords, followed by content until start of another major section or end
+    // Matches <h2> or <h3> containing keywords (including Emojis), followed by content until start of another major section or end
     // Explicitly catches "Verified References" which caused user issues
-    const refPattern = /(<hr[^>]*>\s*)?<h[2-3][^>]*>.*?(References|Further Reading|Bibliography|Verified (References|Sources)|Sources).*?<\/h[2-3]>[\s\S]*?(<hr|<\/div>\s*$|$)/i;
+    const refPattern = /(<hr[^>]*>\s*)?<h[2-3][^>]*>.*?(References|Further Reading|Bibliography|Verified (References|Sources)|Sources|External Resources).*?<\/h[2-3]>[\s\S]*?(<hr|<\/div>\s*$|$|(?=<footer))/i;
     return html.replace(refPattern, '');
 };
 
@@ -114,6 +114,8 @@ const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wp
             // Tier 3: General Topic (Fallback) - Removed restrictive site exclusions to ensure results
             `${keyword}`
         ];
+
+        console.log(`[References] Fetching for "${keyword}" (Year: ${CURRENT_YEAR})...`);
 
         const validLinks: any[] = [];
         const seenUrls = new Set<string>();
@@ -196,7 +198,13 @@ const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wp
         }
 
         // Fallback: If absolutely 0 results even after Tier 3, return empty string (unlikely)
-        if (validLinks.length === 0) return "";
+        if (validLinks.length === 0) {
+            console.warn(`[References] ZERO references found for "${keyword}" after all attempts.`);
+            return "";
+        }
+
+        console.log(`[References] Found ${validLinks.length} valid links for "${keyword}".`);
+
 
         const listItems = validLinks.map(ref =>
             `<li class="hover:translate-x-1 transition-transform duration-200">

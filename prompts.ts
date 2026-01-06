@@ -168,6 +168,7 @@ Return JSON blueprint.
 - NO H1 tags (WordPress auto-generates)
 - NO Markdown fences
 - NO wrapping divs with custom classes
+- **NO REFERENCES:** DO NOT generate a "References", "Verified Sources", or "Bibliography" section.
 - Use semantic HTML5: <article>, <section>, <blockquote>, <figure>
 - Tables: Full HTML with inline styles for compatibility
 - Lists: Use both <ul> and <ol> strategically

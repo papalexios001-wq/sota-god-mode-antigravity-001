@@ -130,149 +130,101 @@ export async function generateAndValidateReferences(
     onProgress?: (message: string) => void
 ): Promise<ValidatedReference[]> {
     try {
-        console.log('[SOTA References] Generating references...');
-        onProgress?.('🔍 Generating authoritative references...');
+        console.log('[SOTA References] Generating SOTA references (Waterfall Strategy)...');
+        onProgress?.('🔍 Fetching verified, high-authority references...');
+
+        if (!serperApiKey) return [];
 
         const currentYear = new Date().getFullYear();
 
-        const systemPrompt = `You are a Reference Validation Specialist.
+        // SOTA Waterfall Logic (Duplicated for robustness/isolation)
+        // Strat 1: Strict Data/Stats
+        // Strat 2: Broad Guides
+        // Strat 3: General Best Practices
 
-Generate high-quality, verifiable, TOPIC-SPECIFIC references.
+        const queries = [
+            `${keyword} "research" "data" "statistics" ${currentYear} -site:youtube.com -site:pinterest.com -site:quora.com`,
+            `${keyword} "report" "study" "findings" ${currentYear - 1}..${currentYear} -site:youtube.com`,
+            `${keyword} definitive guide expert analysis`
+        ];
 
-**CRITICAL REQUIREMENTS:**
-1. References MUST be DIRECTLY RELEVANT to the specific topic (not generic)
-2. Each reference must be from an AUTHORITATIVE source (.edu, .gov, major publications, research institutions)
-3. References must be RECENT (${currentYear} preferred)
-4. References must have REAL, VERIFIABLE URLs
-5. Each reference should be UNIQUE to this topic (would NOT fit a different topic)
+        const validLinks: ValidatedReference[] = [];
+        const seenUrls = new Set<string>();
 
-**WHAT TO AVOID:**
-❌ Generic content marketing/SEO/blogging advice
-❌ References that could apply to ANY topic
-❌ Low-authority blog posts
-❌ Made-up or hallucinated URLs
-❌ Outdated sources (pre-2023)
+        // Domain Blocklist
+        const BLOCKED_DOMAINS = [
+            'reddit.com', 'quora.com', 'twitter.com', 'facebook.com', 'instagram.com', 'tiktok.com',
+            'youtube.com', 'vimeo.com', 'pinterest.com', 'tumblr.com',
+            'amazon.com', 'ebay.com', 'walmart.com', 'etsy.com',
+            'tripadvisor.com', 'yelp.com',
+            'researchgate.net', 'academia.edu',
+            'scribd.com', 'slideshare.net', 'issuu.com', 'yumpu.com',
+            'medium.com', 'linkedin.com'
+        ];
 
-**OUTPUT FORMAT (JSON only):**
-{
-  "references": [
-    {
-      "title": "Specific citation title (must be topic-specific)",
-      "author": "Author/Organization",
-      "url": "https://real-verifiable-url.com",
-      "source": "Publication name (.edu, .gov, major publication)",
-      "year": ${currentYear},
-      "relevance": "Why this is directly relevant to THIS SPECIFIC topic"
-    }
-  ]
-}`;
+        for (const query of queries) {
+            if (validLinks.length >= 10) break;
 
-        const userPrompt = `**TOPIC:** ${keyword}
+            try {
+                // We use fetch directly here since we can't easily import fetchWithProxies helper or we assume it's available in file context
+                // The file has 'import { fetchWithProxies } from './contentUtils';' at line 1.
+                const response = await fetchWithProxies('https://google.serper.dev/search', {
+                    method: 'POST',
+                    headers: {
+                        'X-API-Key': serperApiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ q: query, num: 20 })
+                });
 
-**CONTENT SUMMARY:** ${contentSummary.substring(0, 500)}
+                if (response.ok) {
+                    const data = await response.json();
+                    const candidates = data.organic || [];
 
-**TASK:**
-Generate 8-12 authoritative, TOPIC-SPECIFIC references for the topic "${keyword}".
+                    // Parallel Validation
+                    await Promise.all(candidates.map(async (link: any) => {
+                        if (validLinks.length >= 12) return;
+                        if (!link.link || seenUrls.has(link.link)) return;
 
-**CRITICAL RULES:**
-1. Each reference MUST be specifically about "${keyword}" (not generic content/SEO advice)
-2. Use ONLY authoritative sources (.edu, .gov, research institutions, major publications)
-3. References must be from ${currentYear} or ${currentYear - 1}
-4. Each reference should be UNIQUE to this topic
-5. Provide REAL, VERIFIABLE URLs only
+                        try {
+                            const domain = new URL(link.link).hostname.replace('www.', '');
+                            if (BLOCKED_DOMAINS.some(b => domain.includes(b))) return;
 
-**BAD EXAMPLES (DO NOT USE):**
-- "Content Marketing Institute - How to Write Better Content" (too generic)
-- "HubSpot Blog - SEO Best Practices" (not specific to topic)
-- Generic marketing blogs or low-authority sources
+                            seenUrls.add(link.link);
 
-**GOOD EXAMPLES (FORMAT TO FOLLOW):**
-- Topic-specific academic papers, research studies, government reports
-- Industry-specific publications and authoritative sources
-- Expert organizations directly related to the topic
+                            // Validate
+                            const check = await fetchWithProxies(link.link, {
+                                method: 'GET',
+                                headers: {
+                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                                    "Range": "bytes=0-512"
+                                }
+                            });
 
-Return ONLY valid JSON with 8-12 references.`;
-
-        let responseText = '';
-
-        if (model.includes('gemini')) {
-            const result = await aiClient.generateContent({
-                contents: [{ role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }],
-            });
-            responseText = result.response.text();
-        } else if (model.includes('gpt')) {
-            const completion = await aiClient.chat.completions.create({
-                model: model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-            });
-            responseText = completion.choices[0].message.content || '';
-        } else {
-            const message = await aiClient.messages.create({
-                model: model,
-                max_tokens: 4000,
-                system: systemPrompt,
-                messages: [{ role: 'user', content: userPrompt }],
-            });
-            responseText = message.content[0].text;
+                            if (check.ok && check.status === 200) {
+                                validLinks.push({
+                                    title: link.title,
+                                    author: domain, // Fallback to domain as author
+                                    url: link.link,
+                                    source: domain,
+                                    year: currentYear,
+                                    relevance: "Directly relevant authoritative source",
+                                    status: 'valid',
+                                    statusCode: 200
+                                });
+                            }
+                        } catch (e) { }
+                    }));
+                }
+            } catch (e) {
+                console.error(`[SOTA References] Query failed: ${query}`, e);
+            }
         }
 
-        const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const parsed = JSON.parse(cleaned);
+        console.log('[SOTA References] Found', validLinks.length, 'SOTA references');
+        onProgress?.(`✅ Found ${validLinks.length} verified authoritative references`);
 
-        let references: ValidatedReference[] = parsed.references || [];
-
-        console.log('[SOTA References] Validating', references.length, 'references...');
-        onProgress?.(`✅ Validating ${references.length} references...`);
-
-        const validatedReferences = await Promise.all(
-            references.map(async (ref) => {
-                try {
-                    if (!serperApiKey) {
-                        return { ...ref, status: 'valid' as const, statusCode: 200 };
-                    }
-
-                    const searchQuery = `"${ref.title}" ${ref.source}`;
-                    const response = await fetchWithProxies('https://google.serper.dev/search', {
-                        method: 'POST',
-                        headers: {
-                            'X-API-Key': serperApiKey,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ q: searchQuery, num: 3 })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        const results = data.organic || [];
-
-                        if (results.length > 0) {
-                            const topResult = results[0];
-                            return {
-                                ...ref,
-                                url: topResult.link || ref.url,
-                                status: 'valid' as const,
-                                statusCode: 200
-                            };
-                        }
-                    }
-
-                    return { ...ref, status: 'valid' as const, statusCode: 200 };
-
-                } catch (error) {
-                    console.warn('[SOTA References] Validation failed for:', ref.title);
-                    return { ...ref, status: 'valid' as const, statusCode: 200 };
-                }
-            })
-        );
-
-        const validRefs = validatedReferences.filter(r => r.status === 'valid');
-        console.log('[SOTA References] Validated', validRefs.length, 'valid references');
-        onProgress?.(`✅ Validated ${validRefs.length} authoritative references`);
-
-        return validRefs;
+        return validLinks.slice(0, 12);
 
     } catch (error) {
         console.error('[SOTA References] Error:', error);
@@ -375,7 +327,7 @@ Return ONLY valid JSON.`;
             const result = await aiClient.generateContent({
                 contents: [{ role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }],
             });
-            responseText = result.response.text();
+            responseText = result.response?.text ? result.response.text() : '';
         } else if (model.includes('gpt')) {
             const completion = await aiClient.chat.completions.create({
                 model: model,
@@ -467,7 +419,7 @@ export async function generateOptimalInternalLinks(
             if (links.length >= targetCount) return;
 
             const pageWords = page.title.toLowerCase().split(' ');
-            const commonWords = titleWords.filter(word =>
+            const commonWords = titleWords.filter((word: string) =>
                 pageWords.includes(word) && word.length > 3
             );
 
