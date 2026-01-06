@@ -208,20 +208,20 @@ export const fetchVerifiedReferenceData = async (keyword: string, serperApiKey: 
 export const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wpUrl?: string): Promise<string> => {
     if (!serperApiKey) return "";
     try {
-        const filtered = await fetchVerifiedReferenceData(keyword, serperApiKey);
+        const filtered = await fetchVerifiedReferenceData(keyword, serperApiKey, 25); // Request more to ensure we get 8+
 
         // Filter out WP domain if provided
         const finalLinks = wpUrl
             ? filtered.filter(l => !l.source.includes(new URL(wpUrl).hostname.replace('www.', '')))
             : filtered;
 
-        if (finalLinks.length === 0) return "";
+        if (finalLinks.length < 8) return ""; // ENFORCE: Minimum 8 references
 
-        const listItems = finalLinks.slice(0, 8).map(ref =>
+        const listItems = finalLinks.slice(0, 12).map(ref =>
             `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" title="Verified Source: ${ref.source}" style="text-decoration: underline; color: #2563EB;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.source})</span></li>`
         ).join('');
 
-        return `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 2px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 Verified References & Further Reading</h2><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.6;">${listItems}</ul></div>`;
+        return `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 2px solid #3B82F6; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 3px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 References & Further Reading 2026</h2><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.6;">${listItems}</ul></div>`;
     } catch (e) { return ""; }
 };
 
@@ -1002,16 +1002,17 @@ Return ONLY the conclusion text (no headings, just paragraphs).`;
             return;
         }
 
-        const referencesHtml = `
-<h2 style="font-size: 2rem; font-weight: 800; color: #1E293B; margin: 3rem 0 1.5rem 0;">📚 References & Further Reading</h2>
-<ol style="line-height: 2; padding-left: 1.5rem; color: #334155;">
-${references.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: none; font-weight: 600;">${ref.title}</a> - ${ref.description}</li>`).join('\n')}
-</ol>
-<p style="font-size: 0.9rem; color: #64748b; margin: 1rem 0; font-style: italic;">All references verified for accuracy and accessibility as of 2026.</p>
-`;
+        if (references.length < 8) {
+            this.logCallback(`⚠️ Only ${references.length} references generated (minimum 8 required). Skipping section.`);
+            return;
+        }
+
+        const listItems = references.slice(0, 12).map(ref => `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" style="color: #2563EB; text-decoration: underline; font-weight: 600;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.description})</span></li>`).join('');
+
+        const referencesHtml = `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 2px solid #3B82F6; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 3px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 References & Further Reading 2026</h2><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.8;">${listItems}</ul></div>`;
 
         body.insertAdjacentHTML('beforeend', referencesHtml);
-        this.logCallback(`✅ ADDED: ${references.length} verified reference links`);
+        this.logCallback(`✅ ADDED: ${Math.min(references.length, 12)} verified reference links`);
     }
 
     private async validateAndFixReferences(body: HTMLElement, title: string, doc: Document): Promise<void> {
@@ -1594,7 +1595,7 @@ ${finalLinks.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopene
 
                 this.logCallback(`📊 VALIDATION SUMMARY: ${validatedLinks.length} valid, ${checkedCount - validatedLinks.length} failed, ${skippedCount} skipped (same domain)`);
 
-                if (validatedLinks.length > 0) {
+                if (validatedLinks.length >= 8) {
                     this.logCallback(`✅ SUCCESS: ${validatedLinks.length} operational reference links validated (all 200 status)`);
                     this.logCallback(`📝 REFERENCE LINKS:`);
                     validatedLinks.slice(0, 3).forEach((ref, i) => {
@@ -1608,18 +1609,18 @@ ${finalLinks.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopene
                         `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" title="Verified Source: ${ref.source}" style="text-decoration: underline; color: #2563EB;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.source})</span></li>`
                     ).join('');
 
-                    const referencesHtml = `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 2px solid #3B82F6; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 3px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 Verified References & Further Reading</h2><p style="color: #64748B; font-size: 0.85em; margin-bottom: 1rem; font-style: italic;">All sources verified operational with 200 status codes.</p><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.8;">${listItems}</ul></div>`;
+                    const referencesHtml = `<div class="sota-references-section" style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 2px solid #3B82F6; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"><h2 style="margin-top: 0; font-size: 1.5rem; color: #1E293B; border-bottom: 3px solid #3B82F6; padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 800;">📚 References & Further Reading 2026</h2><ul style="columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 2rem; list-style: disc; padding-left: 1.5rem; line-height: 1.8;">${listItems}</ul></div>`;
 
                     const referencesWrapper = doc.createElement('div');
                     referencesWrapper.innerHTML = referencesHtml;
                     body.appendChild(referencesWrapper.firstElementChild || referencesWrapper);
 
                     structuralFixesMade++;
-                    this.logCallback(`✅ ADDED: ${validatedLinks.length} verified references to content body (100% operational, all 200 status)`);
+                    this.logCallback(`✅ ADDED: ${validatedLinks.length} verified references to content body`);
                     this.logCallback(`📍 REFERENCES POSITION: Appended at end of body content`);
                 } else {
-                    this.logCallback(`❌ FAILED: No operational reference links found`);
-                    this.logCallback(`❌ Checked ${checkedCount} links from ${potentialLinks.length} search results - none returned 200 status`);
+                    this.logCallback(`❌ FAILED: Only ${validatedLinks.length} operational reference links found (minimum 8 required)`);
+                    this.logCallback(`❌ Checked ${checkedCount} links from ${potentialLinks.length} search results - insufficient valid results`);
                     this.logCallback(`💡 TIP: This may indicate network issues or all sources are paywalled/blocked`);
                 }
             } catch (e: any) {
