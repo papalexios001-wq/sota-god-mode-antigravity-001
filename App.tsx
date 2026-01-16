@@ -1237,7 +1237,7 @@ const App = () => {
                                 content: { 
                                     ...selectedItemForReview.generatedContent!, 
                                     title: updatedSeo.title, 
-GOD MODE will skip🚫 Exclusion Controls                                    content: updatedContent 
+                                    content: updatedContent
                                 } 
                             } 
                         });
