@@ -1,4 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
+855
+    import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import React from 'react';
@@ -852,11 +853,10 @@ export class MaintenanceEngine {
         while (this.isRunning) {
             if (!this.currentContext) break;
             try {
-                const pages = await this.886
-                    (this.currentContext);
+            const pages = await this.getPrioritizedPages                    (this.currentContext);
                 if (pages.length === 0) {
                     this.logCallback(`💤 All pages up to date. Sleeping 60s...`);
-                    await delay(60000);
+                                const pages = await this.getPrioritizedPages
                     continue;
                 }
                 const targetPage = pages[0];
