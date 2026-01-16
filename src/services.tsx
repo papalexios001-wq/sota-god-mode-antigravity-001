@@ -808,9 +808,51 @@ export class MaintenanceEngine {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private async getPrioritizedPages(context: GenerationContext): Promise<SitemapPage[]> {
+private async getPrioritizedPages(context: GenerationContext): Promise<SitemapPage[]> {
+        // SOTA PRIORITY URL QUEUE: Process user-specified URLs FIRST
+        const priorityPages: SitemapPage[] = [];
+        
+        if (context.priorityUrls && context.priorityUrls.length > 0) {
+            this.logCallback(`🎯 PRIORITY QUEUE: ${context.priorityUrls.length} user-specified URLs detected`);
+            
+            for (const url of context.priorityUrls) {
+                const normalizedUrl = url.trim();
+                if (!normalizedUrl) continue;
+                
+                // Check if already processed recently
+                const urlId = btoa(normalizedUrl).substring(0, 20);
+                const lastProcessed = localStorage.getItem(`sota_priority_proc_${urlId}`);
+                if (lastProcessed) {
+                    const hoursSince = (Date.now() - parseInt(lastProcessed)) / (1000 * 60 * 60);
+                    if (hoursSince < 24) {
+                        this.logCallback(`⏭️ Priority URL recently processed: ${normalizedUrl}`);
+                        continue;
+                    }
+                }
+                
+                // Convert URL to SitemapPage format
+                const priorityPage: SitemapPage = {
+                    id: urlId,
+                    url: normalizedUrl,
+                    title: normalizedUrl,
+                    lastMod: new Date().toISOString(),
+                    daysOld: 999, // High priority
+                    isPriorityUrl: true
+                };
+                priorityPages.push(priorityPage);
+                this.logCallback(`✅ Priority URL queued: ${normalizedUrl}`);
+            }
+        }
+        
+        // PRIORITY ONLY MODE: Only process user-specified URLs
+        if (context.priorityOnlyMode && priorityPages.length > 0) {
+            this.logCallback(`🔒 PRIORITY ONLY MODE: Processing ${priorityPages.length} URLs exclusively`);
+            return priorityPages;
+        }
+        
+        // Standard sitemap candidates (only if not in priority-only mode)
         let candidates = [...context.existingPages];
-
+        
         // Filter out recently processed (within 24h) to avoid loops
         candidates = candidates.filter(p => {
             const lastProcessed = localStorage.getItem(`sota_last_proc_${p.id}`);
@@ -818,11 +860,13 @@ export class MaintenanceEngine {
             const hoursSince = (Date.now() - parseInt(lastProcessed)) / (1000 * 60 * 60);
             return hoursSince > 24;
         });
-
+        
         // Prioritize by age (older = better candidate for update)
-        return candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0));
+        candidates = candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0));
+        
+        // CRITICAL: Priority URLs ALWAYS come first, then regular candidates
+        return [...priorityPages, ...candidates];
     }
-
     private async optimizeDOMSurgically(page: SitemapPage, context: GenerationContext) {
         const { wpConfig, apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel } = context;
         this.logCallback(`📥 Fetching LIVE content for: ${page.title}...`);
@@ -952,8 +996,13 @@ export class MaintenanceEngine {
 
             if (publishResult.success) {
                 this.logCallback(`✅ SUCCESS|${page.title}|${publishResult.link || page.id}`);
-                localStorage.setItem(`sota_last_proc_${page.id}`, Date.now().toString());
-            } else {
+                    // SOTA: Mark as processed using appropriate key for priority vs regular URLs
+                    if (page.isPriorityUrl) {
+                        localStorage.setItem(`sota_priority_proc_${page.id}`, Date.now().toString());
+                        this.logCallback(`✅ PRIORITY URL OPTIMIZED: ${page.url}`);
+                    } else {
+                        localStorage.setItem(`sota_last_proc_${page.id}`, Date.now().toString());
+                    }            } else {
                 this.logCallback(`❌ Update Failed: ${publishResult.message}`);
                 // CRITICAL FIX: Don't mark as optimized if publish failed
             }
