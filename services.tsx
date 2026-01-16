@@ -884,6 +884,57 @@ export class MaintenanceEngine {
     }
 
     private async getPrioritizedPages(context: GenerationContext): Promise<SitemapPage[]> {
+            // SOTA: Priority URL Queue - Process user-specified URLs FIRST
+    const priorityPages: SitemapPage[] = [];
+    
+    if (context.priorityUrls && context.priorityUrls.length > 0) {
+      this.logCallback(`🎯 PRIORITY QUEUE: ${context.priorityUrls.length} user-specified URLs detected`);
+      
+      for (const url of context.priorityUrls) {
+        const normalizedUrl = url.trim();
+        if (!normalizedUrl) continue;
+        
+        // Check if already processed recently (within 24h)
+        const lastProcessed = localStorage.getItem(`sota_priority_proc_${normalizedUrl}`);
+        if (lastProcessed) {
+          const hoursSince = (Date.now() - parseInt(lastProcessed)) / (1000 * 60 * 60);
+          if (hoursSince < 24) {
+            this.logCallback(`⏭️ Priority URL recently processed: ${normalizedUrl}`);
+            continue;
+          }
+        }
+        
+        // Create SitemapPage for priority URL
+        const priorityPage: SitemapPage = {
+          id: normalizedUrl,  // Use actual URL as ID
+          url: normalizedUrl,
+          title: normalizedUrl,
+          lastMod: new Date().toISOString(),
+          daysOld: 999,  // High priority
+          isPriorityUrl: true,
+          slug: '',
+          crawledContent: null,
+          healthScore: null,
+          updatePriority: null,
+          justification: null,
+          isStale: false,
+          publishedState: 'none',
+          status: 'idle',
+          analysis: null,
+          wordCount: null
+        };
+        
+        priorityPages.push(priorityPage);
+        this.logCallback(`✅ Priority URL queued: ${normalizedUrl}`);
+      }
+    }
+    
+    // PRIORITY ONLY MODE: Only process user-specified URLs
+    if (context.priorityOnlyMode && priorityPages.length > 0) {
+      this.logCallback(`🔒 PRIORITY ONLY MODE: Processing ${priorityPages.length} URLs exclusively`);
+      return priorityPages;
+    }
+
         let candidates = [...context.existingPages];
 
         const excludedUrls = context.excludedUrls || [];
@@ -943,7 +994,8 @@ export class MaintenanceEngine {
             const hoursSince = (Date.now() - parseInt(lastProcessed)) / (1000 * 60 * 60);
             return hoursSince > 24;
         });
-        return candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0));
+            // SOTA: Priority URLs ALWAYS come first, then regular candidates sorted by age
+    return [...priorityPages, ...candidates.sort((a, b) => (b.daysOld || 0) - (a.daysOld || 0))];
     }
 
     // 🛡️ CONTENT PROTECTION SYSTEM - Preserve critical elements
@@ -1250,14 +1302,33 @@ Return ONLY the conclusion text (no headings, just paragraphs).`;
 
         if (!needsUpdate.shouldUpdate) {
             this.logCallback(`✅ FRESH: ${needsUpdate.reason} - Skipping`);
-            localStorage.setItem(`sota_last_proc_${pageIdentifier}`, Date.now().toString());
+                    // Mark as processed (use different key for priority URLs)
+        if (page.isPriorityUrl) {
+          localStorage.setItem(`sota_priority_proc_${page.url || page.id}`, Date.now().toString());
+        } else {
+          localStorage.setItem(`sota_last_proc_${pageIdentifier}`, Date.now().toString());
+        }
             return;
         }
 
         this.logCallback(`⚡ UPDATE NEEDED: ${needsUpdate.reason}`);
 
         // 🔒 CRITICAL: Mark as processing IMMEDIATELY to prevent duplicate selection
+              // Mark as processed (use different key for priority URLs)
+      ifix: Implement Priority URL Queue processing in MaintenanceEngine
+
+- Add priority URL queue logic to getPrioritizedPages
+- Priority URLs are processed FIRST before sitemap pages
+- Priority Only Mode restricts processing to queued URLs only
+- Use separate localStorage key for priority URL tracking
+- Priority URLs use full URL as ID for correct fetching
+- Update optimizeDOMSurgically to handle priority URL keys
+
+Fixes: Priority URL Queue now actually processes the URLsf (page.isPriorityUrl) {
+        localStorage.setItem(`sota_priority_proc_${page.url || page.id}`, Date.now().toString());
+      } else {
         localStorage.setItem(`sota_last_proc_${pageIdentifier}`, Date.now().toString());
+      }
         this.logCallback(`🔒 LOCKED: Page marked as processing to prevent duplicates`);
 
         // SOTA HOTFIX: Stripping potentially hallucinated references from previous runs
