@@ -1,0 +1,7 @@
+# Deployment Trigger File
+# This file forces Cloudflare to rebuild with a fresh clone
+# Timestamp: 2026-01-16 13:50:00 UTC
+# Trigger reason: Clear cache and rebuild after fixing services.tsx syntax error
+
+DEPLOY_ID=202601161350
+STATUS=active
